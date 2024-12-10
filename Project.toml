@@ -1,4 +1,7 @@
-name = "InjectSillsPIC"
-uuid = "2bff9e26-e576-4d5f-9ccd-5386c912f0a2"
+name = "InjectSills"
+uuid = "2361c6a6-84b7-4f91-9ad3-fbd42a4af622"
 authors = ["Boris Kaus <kaus@uni-mainz.de>"]
 version = "0.1.0"
+
+[deps]
+Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
