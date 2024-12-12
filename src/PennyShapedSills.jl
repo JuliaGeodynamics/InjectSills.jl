@@ -127,13 +127,48 @@ end
 
 
 """
-rotate a 2D point `p` by an angle `angle` (given in degrees)
+    rotate_point!(p::Union{Point{2, _T}, Vec{2,_T}}, angle::Vec{1, _T})
+
+Rotates a 2D point `p` by an angle `angle` (given in degrees) 
 """
 function rotate_point!(p::Union{Point{2, _T}, Vec{2,_T}}, angle::Vec{1, _T}) where {_T}
     
     α       = angle[1]
-    RotMat  = SMatrix{2,2}([cosd(α) -sind(α); sind(α) cosd(α)]);    # 2D rotation matrix
-    p       = RotMat * p
+ 
+    # Note: we spell out the rotation equation to avoid allocations
+    c,s = cosd(α), sind(α)
+    x,y = p[1], p[2]
+    xr = c * x - s * y
+    yr = s * x + c * y
+    p = Point2{_T}(xr, yr)
+    return nothing
+end
+
+"""
+    rotate_point!(p::Union{Point{3, _T}, Vec{3,_T}}, angle::Vec{2, _T})
+
+Rotates a 3D point `p` by angles `angle` (given in degrees) 
+"""
+function rotate_point!(p::Union{Point{3, _T}, Vec{3,_T}}, angle::Vec{2, _T}) where {_T}
+    θ_x, θ_y = angle
+     
+    # Rotation matrix around the x-axis
+    c_x, s_x = cosd(θ_x), sind(θ_x)
+    
+    # Rotation matrix around the y-axis
+    c_y, s_y = cosd(θ_y), sind(θ_y)
+    
+    # Apply rotation around the x-axis
+    y, z = p[2], p[3]
+    yr = c_x * y - s_x * z
+    zr = s_x * y + c_x * z
+    
+    # Apply rotation around the y-axis
+    x, z = p_x, zr
+    xr = c_y * x + s_y * z
+    zr = -s_y * x + c_y * z
+
+    p = Point3{_T}(xr, yr, zr)
     return nothing
 end
 
@@ -144,15 +179,15 @@ host rock displacement caused by opening of a penny shaped sill at point `p`
 """
 function hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T}) where {N,_T}
 
-    @unpack_val ν,E,W,H, ΔP, Center, Angle = sill;
+    GeoParams.@unpack_val ν,E,W,H, ΔP, Center, Angle = sill;
 
     # distance from points to center of sill
     Δ = p - Center
 
     # rotate point
-    #rotate_point!(Δ, Angle)    # allocates
+    rotate_point!(Δ, Angle)    # allocates
 
-    # 
+    # sum of squares of distances (done as loop to avoid allocations)
     r = zero(_T)
     for i=1:N
         r += Δ[i]^2
@@ -186,14 +221,14 @@ function hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T}) whe
 
     Displacement  = Vec{N, _T}(Uz)
     if N==2
-        Displacement = Vec2(Ur,Uz)
+        Displacement = Vec2{_T}(Ur,Uz)
     elseif N==3
         x,y   = abs.(p[1:2]); 
-        Displacement = Vec3(x/r*Ur,y/r*Ur,Uz)
+        Displacement = Vec3{_T}(x/r*Ur,y/r*Ur,Uz)
     end
 
     # rotate backwards
-    # to be implemented
+    rotate_point!(Displacement, -Angle) 
 
     return Displacement
 end
