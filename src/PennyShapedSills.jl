@@ -127,29 +127,28 @@ end
 
 
 """
-    rotate_point!(p::Union{Point{2, _T}, Vec{2,_T}}, angle::Vec{1, _T})
+    pr = rotate_point(p::Union{Point{2, _T}, Vec{2,_T}}, angle::Vec{1, _T})
 
 Rotates a 2D point `p` by an angle `angle` (given in degrees) 
 """
-function rotate_point!(p::Union{Point{2, _T}, Vec{2,_T}}, angle::Vec{1, _T}) where {_T}
-    
+function rotate_point(p::Union{Point{2, _T}, Vec{2,_T}}, angle::Vec{1, _T}) where {_T}
     α       = angle[1]
- 
+  
     # Note: we spell out the rotation equation to avoid allocations
     c,s = cosd(α), sind(α)
     x,y = p[1], p[2]
     xr = c * x - s * y
     yr = s * x + c * y
-    p = Point2{_T}(xr, yr)
-    return nothing
+
+    return Point2{_T}(xr, yr)
 end
 
 """
-    rotate_point!(p::Union{Point{3, _T}, Vec{3,_T}}, angle::Vec{2, _T})
+    pr = rotate_point(p::Union{Point{3, _T}, Vec{3,_T}}, angle::Vec{2, _T})
 
 Rotates a 3D point `p` by angles `angle` (given in degrees) 
 """
-function rotate_point!(p::Union{Point{3, _T}, Vec{3,_T}}, angle::Vec{2, _T}) where {_T}
+function rotate_point(p::Union{Point{3, _T}, Vec{3,_T}}, angle::Vec{2, _T}) where {_T}
     θ_x, θ_y = angle
      
     # Rotation matrix around the x-axis
@@ -168,8 +167,7 @@ function rotate_point!(p::Union{Point{3, _T}, Vec{3,_T}}, angle::Vec{2, _T}) whe
     xr = c_y * x + s_y * z
     zr = -s_y * x + c_y * z
 
-    p = Point3{_T}(xr, yr, zr)
-    return nothing
+    return Point3{_T}(xr, yr, zr)
 end
 
 """
@@ -182,23 +180,102 @@ function hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T}) whe
     GeoParams.@unpack_val ν,E,W,H, ΔP, Center, Angle = sill;
 
     # distance from points to center of sill
-    Δ = p - Center
+    Δ0 = p - Center
 
     # rotate point
-    rotate_point!(Δ, Angle)    # allocates
+    Δ =  rotate_point(Δ0, Angle)    # allocates
 
     # sum of squares of distances (done as loop to avoid allocations)
     r = zero(_T)
-    for i=1:N
+    for i=1:N-1
         r += Δ[i]^2
     end
     r = sqrt(r)
-    z = Δ[N]
+    z = abs(Δ[N])
 
     if r==0; r=1e-3; end
 
     # Compute displacement, using complex functions
-    imW = im*W
+    # Remark: this may not work on GPU's, so we would have to mimic this effect somehow 
+    B::Float64   =  H;                          # maximum thickness of dike
+    a::Float64   =  W #/2.0;                    # radius
+    Q   =   B*(2pi*a.^2)/3.0;                   # volume of dike (follows from eq. 9 and 10a)
+    p   =   3E*Q/(16.0*(1.0 - ν^2)*a^3); 
+    
+    #p = ΔP
+    #a = W/2
+
+    # Compute displacement, using complex functions
+    R1  =   sqrt(r^2. + (z - im*a)^2);
+    R2  =   sqrt(r^2. + (z + im*a)^2);
+
+    # equation 7a:
+    dU   =   im*p*(1+ν)*(1-2ν)/(2pi*E)*( r*log( (R2+z+im*a)/(R1 +z- im*a)) 
+                                                - r/2*((im*a-3z-R2)/(R2+z+im*a) 
+                                                + (R1+3z+im*a)/(R1+z-im*a)) 
+                                                - (2z^2 * r)/(1 -2ν)*(1/(R2*(R2+z+im*a)) -1/(R1*(R1+z-im*a))) 
+                                                + (2*z*r)/(1-2ν)*(1/R2 - 1/R1) );
+    # equation 7b:
+    dW   =       2*im*p*(1-ν^2)/(pi*E)*( z*log( (R2+z+im*a)/(R1+z-im*a)) 
+                                                - (R2-R1) 
+                                                - 1/(2*(1-ν))*( z*log( (R2+z+im*a)/(R1+z-im*a)) - im*a*z*(1/R2 + 1/R1)) );
+
+    # Displacements are the real parts of U and W. 
+    #  Note that this is the total required elastic displacement (in m) to open the dike.
+    #  If we only want to open the dike partially, we will need to normalize these values accordingly (done externally)  
+    Uz   =  real(dW);  # vertical displacement should be corrected for z<0
+    Ur   =  real(dU);
+
+   # Ur, Uz = compute_penny_shaped_displacement_complex(r, z, ΔP, ν, E, W)
+    #Ur, Uz = compute_penny_shaped_displacement(r, z, ΔP, ν, E, W)
+    
+    if (Δ[N]<0); Uz = -Uz; end
+    if (Δ[1]<0); Ur = -Ur; end
+
+    Displacement  = Vec{N, _T}(Uz)
+    if N==2
+        Displacement = Vec2{_T}(Ur,Uz)
+    elseif N==3
+        x,y   = abs.(p[1:2]); 
+        Displacement = Vec3{_T}(x/r*Ur,y/r*Ur,Uz)
+    end
+
+    # rotate backwards
+    Displacement_r = rotate_point(Displacement, -Angle) 
+
+    return Displacement_r
+end
+
+
+
+
+function compute_penny_shaped_displacement(r, z, ΔP, ν, E, W)
+    # WRONG!!!
+    W2 = W^2
+    R1 = sqrt(r^2 + (z - W)^2)
+    R2 = sqrt(r^2 + (z + W)^2)
+
+    # equation 7a:
+    term1 = r * log((R2 + z + W) / (R1 + z - W))
+    term2 = r / 2 * ((W - 3z - R2) / (R2 + z + W) + (R1 + 3z + W) / (R1 + z - W))
+    term3 = (2 * z^2 * r) / (1 - 2ν) * (1 / (R2 * (R2 + z + W)) - 1 / (R1 * (R1 + z - W)))
+    term4 = (2 * z * r) / (1 - 2ν) * (1 / R2 - 1 / R1)
+    dU = ΔP * (1 + ν) * (1 - 2ν) / (2π * E) * (term1 - term2 - term3 + term4)
+
+    # equation 7b:
+    term5 = z * log((R2 + z + W) / (R1 + z - W))
+    term6 = R2 - R1
+    term7 = 1 / (2 * (1 - ν)) * (z * log((R2 + z + W) / (R1 + z - W)) - W * z * (1 / R2 + 1 / R1))
+    dW = 2 * ΔP * (1 - ν^2) / (π * E) * (term5 - term6 - term7)
+
+    Uz = dW  # vertical displacement should be corrected for z<0
+    Ur = dU
+
+    return Ur, Uz
+end
+
+function compute_penny_shaped_displacement_complex(r, z, ΔP, ν, E, W)
+     imW = im*W
     R1  = sqrt(r^2. + (z - imW)^2);
     R2  = sqrt(r^2. + (z + imW)^2);
 
@@ -216,20 +293,5 @@ function hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T}) whe
 
     Uz =  real(dW);  # vertical displacement should be corrected for z<0
     Ur =  real(dU);
-    if (p[N]<0); Uz = -Uz; end
-    if (p[1]<0); Ur = -Ur; end
-
-    Displacement  = Vec{N, _T}(Uz)
-    if N==2
-        Displacement = Vec2{_T}(Ur,Uz)
-    elseif N==3
-        x,y   = abs.(p[1:2]); 
-        Displacement = Vec3{_T}(x/r*Ur,y/r*Ur,Uz)
-    end
-
-    # rotate backwards
-    rotate_point!(Displacement, -Angle) 
-
-    return Displacement
+    return Ur, Uz
 end
-
