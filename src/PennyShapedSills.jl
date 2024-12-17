@@ -1,8 +1,7 @@
 # Penny shapes sills embedded in a homogeneous elastic halfspace 
-using Adapt, StaticArrays
+using Adapt
 import Base.show
 import GeoParams: isdimensional
-
 
 export PennyShapedSill, set_penny_shaped_sill, hostrock_displacement
 
@@ -31,7 +30,7 @@ Reference:
         https://doi.org/10.1029/JB074i025p05995
 
 """
-struct PennyShapedSill{N, _T, N1, U1, U2, U3, U4, U5} <: AbstractSill{N,_T}
+struct PennyShapedSill{N, _T, N1, N2, U1, U2, U3, U4, U5} <: AbstractSill{N,_T}
     Center::GeoUnit{Point{N, _T},U1}  # m
     Angle::GeoUnit{Vec{N1, _T},U2}    # degrees
     E::GeoUnit{_T,U3}   # in Pa   
@@ -40,11 +39,14 @@ struct PennyShapedSill{N, _T, N1, U1, U2, U3, U4, U5} <: AbstractSill{N,_T}
     Q::GeoUnit{_T,U5}   # m^3  
     W::GeoUnit{_T,U1}   # m  
     H::GeoUnit{_T,U1}   # m
+    RotMat::GeoUnit{SMatrix{N,N,_T,N2},U4}             # rotation matrix (precomputed for efficiency)
+    RotMat_negative::GeoUnit{SMatrix{N,N,_T,N2},U4}    # with negative angle 
 end
 PennyShapedSill(args...) = PennyShapedSill(convert.(GeoUnit, args)...)
 Adapt.@adapt_structure PennyShapedSill
 
 isdimensional(PennyShapedSill) = isdimensional(PennyShapedSill.E)
+
 
 """
     PennyShapedSill(; W=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e10Pa, ν=0.3*NoUnits, Angle=Vec1(0.0)*Pas, Center=Point2(0.0)*m)
@@ -97,12 +99,19 @@ function PennyShapedSill(; W=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e
 
     end
 
+
     if isnothing(W) || isnothing(Q) || isnothing(ΔP) || isnothing(H)
         error("you need to specify W and Q or ΔP and H or combinations")
     end
 
-    return PennyShapedSill(Center, Angle, E, ν, ΔP, Q, W, H)
+    # Compute rotation matrix
+    # This is a relatively expensive operation, so we precompute & store it 
+    RotMat = RotationMatrix(ustrip.(Angle))
+    RotMat_negative = RotationMatrix(-ustrip.(Angle))
+
+    return PennyShapedSill(Center, Angle, E, ν, ΔP, Q, W, H, RotMat, RotMat_negative)   
 end
+
 
 # Print info in the REPL
 function show(io::IO, g::PennyShapedSill)
@@ -125,51 +134,6 @@ function show(io::IO, g::PennyShapedSill)
     return nothing
 end
 
-
-"""
-    pr = rotate_point(p::Union{Point{2, _T}, Vec{2,_T}}, angle::Vec{1, _T})
-
-Rotates a 2D point `p` by an angle `angle` (given in degrees) 
-"""
-function rotate_point(p::Union{Point{2, _T}, Vec{2,_T}}, angle::Vec{1, _T}) where {_T}
-    α       = angle[1]
-  
-    # Note: we spell out the rotation equation to avoid allocations
-    c,s = cosd(α), sind(α)
-    x,y = p[1], p[2]
-    xr = c * x - s * y
-    yr = s * x + c * y
-
-    return Point2{_T}(xr, yr)
-end
-
-"""
-    pr = rotate_point(p::Union{Point{3, _T}, Vec{3,_T}}, angle::Vec{2, _T})
-
-Rotates a 3D point `p` by angles `angle` (given in degrees) 
-"""
-function rotate_point(p::Union{Point{3, _T}, Vec{3,_T}}, angle::Vec{2, _T}) where {_T}
-    θ_x, θ_y = angle
-     
-    # Rotation matrix around the x-axis
-    c_x, s_x = cosd(θ_x), sind(θ_x)
-    
-    # Rotation matrix around the y-axis
-    c_y, s_y = cosd(θ_y), sind(θ_y)
-    
-    # Apply rotation around the x-axis
-    y, z = p[2], p[3]
-    yr = c_x * y - s_x * z
-    zr = s_x * y + c_x * z
-    
-    # Apply rotation around the y-axis
-    x, z = p_x, zr
-    xr = c_y * x + s_y * z
-    zr = -s_y * x + c_y * z
-
-    return Point3{_T}(xr, yr, zr)
-end
-
 """
     set_penny_shaped_sill(sill::PennyShapedSill{N,_T}, args...)
 
@@ -183,7 +147,7 @@ function hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T}) whe
     Δ0 = p - Center
 
     # rotate point
-    Δ =  rotate_point(Δ0, Angle)    # allocates
+    Δ =  rotate_point(Δ0, sill.RotMat.val)    
 
     # sum of squares of distances (done as loop to avoid allocations)
     r = zero(_T)
@@ -193,40 +157,13 @@ function hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T}) whe
     r = sqrt(r)
     z = abs(Δ[N])
 
-    if r==0; r=1e-3; end
+    # Function below cannot deal with zero
+    if r==0; r=1e-8; end
+    if z==0; z=1e-8; end
 
     # Compute displacement, using complex functions
     # Remark: this may not work on GPU's, so we would have to mimic this effect somehow 
-    B::Float64   =  H;                          # maximum thickness of dike
-    a::Float64   =  W #/2.0;                    # radius
-    Q   =   B*(2pi*a.^2)/3.0;                   # volume of dike (follows from eq. 9 and 10a)
-    p   =   3E*Q/(16.0*(1.0 - ν^2)*a^3); 
-    
-    #p = ΔP
-    #a = W/2
-
-    # Compute displacement, using complex functions
-    R1  =   sqrt(r^2. + (z - im*a)^2);
-    R2  =   sqrt(r^2. + (z + im*a)^2);
-
-    # equation 7a:
-    dU   =   im*p*(1+ν)*(1-2ν)/(2pi*E)*( r*log( (R2+z+im*a)/(R1 +z- im*a)) 
-                                                - r/2*((im*a-3z-R2)/(R2+z+im*a) 
-                                                + (R1+3z+im*a)/(R1+z-im*a)) 
-                                                - (2z^2 * r)/(1 -2ν)*(1/(R2*(R2+z+im*a)) -1/(R1*(R1+z-im*a))) 
-                                                + (2*z*r)/(1-2ν)*(1/R2 - 1/R1) );
-    # equation 7b:
-    dW   =       2*im*p*(1-ν^2)/(pi*E)*( z*log( (R2+z+im*a)/(R1+z-im*a)) 
-                                                - (R2-R1) 
-                                                - 1/(2*(1-ν))*( z*log( (R2+z+im*a)/(R1+z-im*a)) - im*a*z*(1/R2 + 1/R1)) );
-
-    # Displacements are the real parts of U and W. 
-    #  Note that this is the total required elastic displacement (in m) to open the dike.
-    #  If we only want to open the dike partially, we will need to normalize these values accordingly (done externally)  
-    Uz   =  real(dW);  # vertical displacement should be corrected for z<0
-    Ur   =  real(dU);
-
-   # Ur, Uz = compute_penny_shaped_displacement_complex(r, z, ΔP, ν, E, W)
+    Ur, Uz = compute_penny_shaped_displacement_complex(r, z, ΔP, ν, E, W)
     #Ur, Uz = compute_penny_shaped_displacement(r, z, ΔP, ν, E, W)
     
     if (Δ[N]<0); Uz = -Uz; end
@@ -236,17 +173,17 @@ function hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T}) whe
     if N==2
         Displacement = Vec2{_T}(Ur,Uz)
     elseif N==3
-        x,y   = abs.(p[1:2]); 
+        x = abs(Δ[1])
+        y = abs(Δ[2])
+        
         Displacement = Vec3{_T}(x/r*Ur,y/r*Ur,Uz)
     end
 
     # rotate backwards
-    Displacement_r = rotate_point(Displacement, -Angle) 
+    Displacement_r = rotate_point(Displacement, sill.RotMat_negative.val) 
 
     return Displacement_r
 end
-
-
 
 
 function compute_penny_shaped_displacement(r, z, ΔP, ν, E, W)
@@ -274,8 +211,14 @@ function compute_penny_shaped_displacement(r, z, ΔP, ν, E, W)
     return Ur, Uz
 end
 
+
+"""
+    compute_penny_shaped_displacement_complex(r, z, ΔP, ν, E, W)
+
+Compute the displacement around a penny-shaped sill in a homogeneous elastic halfspace using the original implementation of Sun that uses complex numbers. 
+"""
 function compute_penny_shaped_displacement_complex(r, z, ΔP, ν, E, W)
-     imW = im*W
+    imW = im*W
     R1  = sqrt(r^2. + (z - imW)^2);
     R2  = sqrt(r^2. + (z + imW)^2);
 
@@ -293,5 +236,6 @@ function compute_penny_shaped_displacement_complex(r, z, ΔP, ν, E, W)
 
     Uz =  real(dW);  # vertical displacement should be corrected for z<0
     Ur =  real(dU);
+
     return Ur, Uz
 end
