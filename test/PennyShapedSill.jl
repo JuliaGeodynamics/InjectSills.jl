@@ -10,6 +10,11 @@ a_nd = nondimensionalize(a, CharDim)
 
 # Define sill with different parameters
 sill0 = PennyShapedSill()
+@test isdimensional(sill0) == true
+
+# test that we can nondimensionalize this
+sill0_nd = nondimensionalize(sill0, CharDim)
+@test isdimensional(sill0_nd) == false
 
 sill = PennyShapedSill(ΔP = 1e6Pa)
 @test UnitValue(sill.W) ≈ UnitValue(sill0.W) 
@@ -120,6 +125,7 @@ d       = hostrock_displacement(sill3D, p)
 @test d[1] ≈ 0.0
 @test d[2] ≈ -11.219951034388439
 @test d[3] ≈ 2.2728421032456027e-5
+
 
 #=
 using Plots
