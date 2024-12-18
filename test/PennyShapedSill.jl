@@ -122,9 +122,9 @@ d       = hostrock_displacement(sill3D, p)
 sill3D  = PennyShapedSill(Center=Point3(0.0,0,-25000)*m, H=100.0m, W=10000.0m, Angle=Vec2(80.0,-31))
 p       = Point3(0,0,12.0)
 d       = hostrock_displacement(sill3D, p)
-@test d[1] ≈ 0.279395551087826  
-@test d[2] ≈ 0.291934850929267
-@test d[3] ≈-0.4440914005320243
+@test d[1] ≈ 0.2515393693569801  
+@test d[2] ≈ 0.15114010118163726
+@test d[3] ≈ -0.5238221250191283
 
 # Case that used to give NaN:
 sill3D  = PennyShapedSill(Center=Point3(0.0,0,-25000)*m, H=100.0m, W=20000.0m, Angle=Vec2(0,0))

@@ -103,8 +103,8 @@ function PennyShapedSill(; W=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e
 
     # Compute rotation matrix - as this is a relatively expensive operation, we precompute & store it in the struct
     RotMat = RotationMatrix(ustrip.(Angle))
-    RotMat_negative = RotationMatrix(-ustrip.(Angle))
-
+    RotMat_negative = RotMat' 
+    
     return PennyShapedSill(Center, Angle, E, ν, ΔP, Q, W, H, RotMat, RotMat_negative)   
 end
 
@@ -176,7 +176,9 @@ function hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T}) whe
     end
 
     # rotate backwards
-    Displacement_r = rotate_point(Displacement, sill.RotMat_negative.val) 
+    #Displacement_r = rotate_point(Displacement, sill.RotMat_negative.val) 
+    Displacement_r = rotate_point(Displacement, sill.RotMat.val') 
+    
 
     return Displacement_r
 end
