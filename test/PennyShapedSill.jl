@@ -41,6 +41,14 @@ d = hostrock_displacement(sill0, p)
 @test d[1] ≈ -0.00011540383661873777
 @test d[2] ≈ 0.010816226990412455
 
+function perform_computation(x::_T,y::_T, sill::AbstractSill{N,_T}) where {N,_T}
+    p = Point2{_T}(x,y)
+    d = hostrock_displacement(sill, p)
+    return d
+end
+d = perform_computation(10.0, 11.1, sill2D)
+@test   -0.00011488707183608771 ≈ d[1]
+
 
 # test displacement routines itself 
 
@@ -126,6 +134,33 @@ d       = hostrock_displacement(sill3D, p)
 @test d[2] ≈ -11.219951034388439
 @test d[3] ≈ 2.2728421032456027e-5
 
+
+# test inside routines
+sill2D = PennyShapedSill(Center=Point2(0,-15000)*m, H=100.0m, W=10000.0m, Angle=Vec1(0))
+p=Point2(0,0.0)
+@test inside(p, sill2D) == false
+
+@test inside(Point2(0,-15e3    ), sill2D) == true
+@test inside(Point2(0,-15e3+100), sill2D) == true
+@test inside(Point2(0,-15e3+101), sill2D) == false
+@test inside(Point2(-10000,-15e3    ), sill2D) == true
+@test inside(Point2(-10001,-15e3    ), sill2D) == false
+@test inside(Point2( 10001,-15e3    ), sill2D) == false
+
+
+sill3D = PennyShapedSill(Center=Point3(0,0,-15000)*m, H=100.0m, W=10000.0m, Angle=Vec2(0,0))
+p=Point3(0,0.0,0)
+@test inside(p, sill3D) == false
+
+@test inside(Point3(0,0,-15e3    ), sill3D) == true
+@test inside(Point3(0,0,-15e3+100), sill3D) == true
+@test inside(Point3(0,0,-15e3+101), sill3D) == false
+@test inside(Point3(-10000,0,-15e3    ), sill3D) == true
+@test inside(Point3(-10001,0,-15e3    ), sill3D) == false
+@test inside(Point3( 10001,0,-15e3    ), sill3D) == false
+@test inside(Point3(0,-10000,-15e3    ), sill3D) == true
+@test inside(Point3(0,-10001,-15e3    ), sill3D) == false
+@test inside(Point3(0, 10001,-15e3    ), sill3D) == false
 
 #=
 using Plots

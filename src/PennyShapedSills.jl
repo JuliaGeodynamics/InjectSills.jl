@@ -4,6 +4,7 @@ import Base.show
 import GeoParams: isdimensional
 
 export PennyShapedSill, set_penny_shaped_sill, hostrock_displacement
+export inside
 
 
 """
@@ -21,7 +22,6 @@ Parameters:
 - `Q::_T`                                - Total injected volume of sill [m^3]
 - `W::_T = (3*E*Q/(16*(1-ν^2)*ΔP))^(1.0/3.0)`     - Width of sill
 - `H::_T = 8*(1-ν^2)*ΔP*W/(π*E)`                  - Maximum thickness of sill
-
 
 Reference:
 ===
@@ -46,7 +46,6 @@ PennyShapedSill(args...) = PennyShapedSill(convert.(GeoUnit, args)...)
 Adapt.@adapt_structure PennyShapedSill
 
 isdimensional(PennyShapedSill) = isdimensional(PennyShapedSill.E)
-
 
 """
     PennyShapedSill(; W=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e10Pa, ν=0.3*NoUnits, Angle=Vec1(0.0)*Pas, Center=Point2(0.0)*m)
@@ -96,16 +95,13 @@ function PennyShapedSill(; W=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e
     elseif !isnothing(H) && !isnothing(ΔP)
         W = (π * E * H) / (8 * (1 - ν^2) * ΔP)
         Q = (π^3 * E^2 * H^3) / (96 * (1 - ν^2)^2 * ΔP^2)
-
     end
-
 
     if isnothing(W) || isnothing(Q) || isnothing(ΔP) || isnothing(H)
         error("you need to specify W and Q or ΔP and H or combinations")
     end
 
-    # Compute rotation matrix
-    # This is a relatively expensive operation, so we precompute & store it 
+    # Compute rotation matrix - as this is a relatively expensive operation, we precompute & store it in the struct
     RotMat = RotationMatrix(ustrip.(Angle))
     RotMat_negative = RotationMatrix(-ustrip.(Angle))
 
@@ -187,6 +183,8 @@ end
 
 
 function compute_penny_shaped_displacement(r, z, ΔP, ν, E, W)
+    # Attempt to mimic the complex implementation of Sun (below) using real numbers
+    error("This does not work correctly, use the complex implementation")
     # WRONG!!!
     W2 = W^2
     R1 = sqrt(r^2 + (z - W)^2)
@@ -238,4 +236,37 @@ function compute_penny_shaped_displacement_complex(r, z, ΔP, ν, E, W)
     Ur =  real(dU);
 
     return Ur, Uz
+end
+
+
+"""
+    inside(p::Point{2, _T}, sill::PennyShapedSill{2,_T})
+checks if a 2D point `p` is inside the sill
+"""
+function inside(p::Point{2, _T}, sill::PennyShapedSill{2,_T}) where {_T}
+    GeoParams.@unpack_val W,H, Center, RotMat = sill;
+
+    # shift and rotate point
+    p_r =  rotate_point(p - Center, RotMat)    
+
+    distance    = (p_r[1] / W)^2 + (p_r[2] / H)^2
+
+    return distance <= 1
+end
+
+
+
+"""
+    inside(p::Point{3, _T}, sill::PennyShapedSill{3,_T})
+checks if a 3D point `p` is inside the sill
+"""
+function inside(p::Point{3, _T}, sill::PennyShapedSill{3,_T}) where {_T}
+    GeoParams.@unpack_val W,H, Center, RotMat = sill;
+
+    # shift and rotate point
+    p_r =  rotate_point(p - Center, RotMat)    
+
+    distance = (p_r[1] / W)^2 + (p_r[2] / W)^2 + (p_r[3] / H)^2
+
+    return distance <= 1
 end
