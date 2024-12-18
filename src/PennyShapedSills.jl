@@ -15,11 +15,11 @@ Holds information about a penny shaped sill in 2D or 3D.
 Parameters:
 ====
 - `Center::Point{N, _T}`  - Center of sill
-- `Angle::Vec{N1, _T}`       - Dip and strike angle of sill w.r.t. horizontal
-- `E::_T`                                - Young's modulus
-- `ν::_T`                                   - Poisson's ratio
-- `ΔP::_T`                                  - Overpressure within sill
-- `Q::_T`                                - Total injected volume of sill [m^3]
+- `Angle::Vec{N1, _T}`    - Dip and strike (in 3D) angle of sill w.r.t. horizontal
+- `E::_T`                 - Young's modulus
+- `ν::_T`                 - Poisson's ratio
+- `ΔP::_T`                - Overpressure within sill
+- `Q::_T`                 - Total injected volume of sill [m^3]
 - `W::_T = (3*E*Q/(16*(1-ν^2)*ΔP))^(1.0/3.0)`     - Width of sill
 - `H::_T = 8*(1-ν^2)*ΔP*W/(π*E)`                  - Maximum thickness of sill
 
@@ -131,9 +131,9 @@ function show(io::IO, g::PennyShapedSill)
 end
 
 """
-    set_penny_shaped_sill(sill::PennyShapedSill{N,_T}, args...)
+    d = hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T})
 
-host rock displacement caused by opening of a penny shaped sill at point `p`
+Host rock displacement caused by opening of a penny shaped sill at point `p`
 """
 function hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T}) where {N,_T}
 
