@@ -1,6 +1,7 @@
 
 # few helper routines such as rotation matrixes 
 using StaticArrays, GeometryBasics
+export new_point_inside_sill
 
 function RotationMatrix(Angle::Vec{1, _T})  where {_T}
     sinDipAngle, cosDipAngle  = sincosd(Angle[1])
@@ -75,3 +76,42 @@ function  hostrock_displacement(sill::AbstractSill{2,_T}, X::AbstractArray{_T,N}
 
     return Dx, Dz
 end
+
+
+
+"""
+    pt = new_point_inside_sill(sill::AbstractSill{N,_T})
+
+This generates a single new point that is within the sill
+"""
+function new_point_inside_sill(sill::AbstractSill{N,_T}) where {_T,N}
+    GeoParams.@unpack_val W,H, Center, Angle = sill;
+
+    isinside = false
+    count = 1;
+    coord = zero(Center)
+    
+    while !isinside && count<1000
+        count += 1
+
+        # generate a point that is within a square region that could be within the sill    
+        coord = point_within_box(coord,W,H)
+
+        # Rotate the point
+        coord =  rotate_point(coord, sill.RotMat.val')   
+
+        # Shift
+        coord += Center
+
+        # check if the point is within the sill
+        isinside = inside(coord, sill)
+        #isinside = true
+    end
+    
+
+    return coord
+end
+
+point_within_box(p::Point{2, _T},W,H) where {_T} = Point2{_T}( 2*(rand()-0.5)*W, (rand()-0.5)*H )
+point_within_box(p::Point{3, _T},W,H) where {_T} = Point3{_T}( 2*(rand()-0.5)*W, 2*(rand()-0.5)*W, (rand()-0.5)*H )
+

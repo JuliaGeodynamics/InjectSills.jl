@@ -251,7 +251,7 @@ function inside(p::Point{2, _T}, sill::PennyShapedSill{2,_T}) where {_T}
     # shift and rotate point
     p_r =  rotate_point(p - Center, RotMat)    
 
-    distance    = (p_r[1] / W)^2 + (p_r[2] / H)^2
+    distance    = sqrt((p_r[1] / (W/1))^2 + (p_r[2] / (H/2))^2)
 
     return distance <= 1
 end
