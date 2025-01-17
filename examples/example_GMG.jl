@@ -44,13 +44,13 @@ proj      = ProjectionPoint(; Lat=mean(Topo.lat.val[:]), Lon=mean(Topo.lon.val[:
 Topo_cart = convert2CartData(Topo, proj)
 
 # Create a sill. Note that the dimensions are in meters!
-sill3D = PennyShapedSill(Center=Point3(0,0,-3000)*m, H=100.0m, W=2000.0m, Angle=Vec2(90,-20))
+sill3D = PennyShapedSill(Center=Point3(0,0,-3000)*m, H=100.0m, W=2000.0m, Angle=Vec2(10,-20))
 
 # Compute surface deformation caused by the sill
 Topo_cart = surface_deformation_sill(Topo_cart, sill3D)
 
 # 3D displacement field
-XYZ             = xyz_grid(-5:.1:5,-5:.1:5,-10:.1:2)
+XYZ             = xyz_grid(-5:.05:5,-5:.05:5,-10:.05:2)
 Data            = CartData(XYZ)
 displacement    = hostrock_displacement(sill3D, XYZ[1]*1000, XYZ[2]*1000, XYZ[3]*1000)
 Data            = addfield(Data, (;displacement,))
