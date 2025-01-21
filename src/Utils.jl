@@ -128,9 +128,9 @@ function new_point_inside_sill(sill::AbstractSill{N,_T}, xvi, nx, ny; parts_per_
     # iterate over cells
     for j in axes(parts2inject, 2), i in axes(parts2inject, 1)
 
-        # check if any corner of the cell is within the sill
-        iscell_inside = any(
-            inside(Point{N,_T}(xvi[1][ii], xvi[2][jj]), sill) for ii in i:i+1, jj in j:j+1
+        iscell_inside = rectangles_intercept(
+            (xvi[1][i], xvi[2][j], xvi[1][i+1], xvi[2][j+1]),         # x1_min, y1_min, x1_max, y1_max
+            (Center[1] - W/2, Center[2] - H/2, Center[1] + W/2, Center[2] + H/2)  # x2_min, y2_min, x2_max, y2_max
         )
 
         iscell_inside || continue
@@ -160,6 +160,22 @@ function new_point_inside_sill(sill::AbstractSill{N,_T}, xvi, nx, ny; parts_per_
     return parts2inject
 end
 
+function rectangles_intercept(rect1, rect2)
+    # Unpack the rectangles
+    x1_min, y1_min, x1_max, y1_max = rect1
+    x2_min, y2_min, x2_max, y2_max = rect2
+
+    # Check if there is no overlap
+    if x1_max < x2_min || x2_max < x1_min || y1_max < y2_min || y2_max < y1_min
+        return false
+    end
+
+    # Otherwise, they intersect
+    return true
+end
+
 point_within_box(p::Point{2, _T},W,H) where {_T} = Point2{_T}( 2*(rand()-0.5)*W, (rand()-0.5)*H )
 point_within_box(p::Point{3, _T},W,H) where {_T} = Point3{_T}( 2*(rand()-0.5)*W, 2*(rand()-0.5)*W, (rand()-0.5)*H )
+
+
 
