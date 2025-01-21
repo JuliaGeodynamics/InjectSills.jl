@@ -126,7 +126,7 @@ function new_point_inside_sill(sill::AbstractSill{N,_T}, xvi, nx, ny; parts_per_
     dummy        = zero(Center)
 
     # iterate over cells
-    for j in axes(parts2inject, 2)[1:end-1], i in axes(parts2inject, 1)[1:end-1]
+    for j in axes(parts2inject, 2), i in axes(parts2inject, 1)
 
         # check if any corner of the cell is within the sill
         iscell_inside = any(
