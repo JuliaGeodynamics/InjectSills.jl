@@ -125,14 +125,17 @@ function new_point_inside_sill(sill::AbstractSill{N,_T}, xvi, nx, ny; parts_per_
     parts2inject = fill(Point{N,_T}(NaN,NaN), nx, ny, parts_per_cell)
     dummy        = zero(Center)
 
+    # iterate over cells
     for j in axes(parts2inject, 2)[1:end-1], i in axes(parts2inject, 1)[1:end-1]
 
+        # check if any corner of the cell is within the sill
         iscell_inside = any(
             inside(Point{N,_T}(xvi[1][ii], xvi[2][jj]), sill) for ii in i:i+1, jj in j:j+1
         )
 
         iscell_inside || continue
 
+        # iterate over particles in the cell
         for k in axes(parts2inject, 3)
             # @show (i,j,k)
 
