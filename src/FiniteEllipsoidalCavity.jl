@@ -509,7 +509,7 @@ function RF(x, y, z, r)
     ym = y
     zm = z
     A0 = (x + y + z) / 3
-    Q = max([abs(A0 - x), abs(A0 - y), abs(A0 - z)]) / (3 * r)^(1/6)
+    Q = maximum([abs(A0 - x), abs(A0 - y), abs(A0 - z)]) / (3 * r)^(1/6)
     n = 0
     Am = A0
     
@@ -550,7 +550,7 @@ function RD(x, y, z, r)
     ym = y
     zm = z
     A0 = (x + y + 3*z) / 5
-    Q = max([abs(A0 - x), abs(A0 - y), abs(A0 - z)]) / (r / 4)^(1/6)
+    Q = maximum([abs(A0 - x), abs(A0 - y), abs(A0 - z)]) / (r / 4)^(1/6)
     n = 0
     Am = A0
     S = 0.0

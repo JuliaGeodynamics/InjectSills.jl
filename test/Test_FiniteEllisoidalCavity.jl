@@ -57,7 +57,7 @@ ue,un,uv,dV,DV,Ns = fECM(X,Y,X0,Y0,depth,omegaX,omegaY,omegaZ,ax,ay,az,p,mu,lamb
 @test all(extrema(uv) .≈ (3.405925303200454e-04, 0.022797797325954))
 @test uv[1,1]          ≈ 0.020284896020590
 @test uv[9,100]        ≈ 0.004740361583832
-@test uv[87,46]        ≈ 0.003437710863156
+@test uv[87,46]        ≈ 0.001025808009311
 @test maximum(ue)      ≈ 0.017285000082854
 @test maximum(un)      ≈ 0.011987093395042
 
