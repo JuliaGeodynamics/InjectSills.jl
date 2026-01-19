@@ -4,3 +4,6 @@ using InjectSills, Test
     include("PennyShapedSill.jl")
 end
 
+@testset "Finite Ellipsodial Cavity" begin
+    include("Test_FiniteEllisoidalCavity.jl")
+end
