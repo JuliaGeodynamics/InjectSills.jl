@@ -114,13 +114,13 @@ EFCS: Earth-Fixed Coordinate System
 ```julia
 X, Y = 0:50:7000, zeros(length(0:50:7000))
 X0, Y0 = 0.0, 0.0
-dT = 550.0
+depth = 2550.0
 omegaX, omegaY, omegaZ = 11.0, -7.0, 120.0
-ax, ay, az = 450.0, 600.0, 1225.0
+ax, ay, az = 450.0, 600.0, 525.0
 p = 1e6
 mu, lambda = 1e9, 1e9
-ue, un, uv, dV, DV, Ns = fECM(X, Y, X0, Y0, dT, omegaX, omegaY, omegaZ, 
-                              ax, ay, az, p, mu, lambda, "T"; Nmax=4000, Cr=12)
+ue, un, uv, dV, DV, Ns = fECM(X, Y, X0, Y0, depth, omegaX, omegaY, omegaZ, 
+                              ax, ay, az, p, mu, lambda, "C"; Nmax=4000, Cr=12)
 ```
 """
 function fECM(X, Y, X0, Y0, depth, omegaX, omegaY, omegaZ,
@@ -133,7 +133,7 @@ function fECM(X, Y, X0, Y0, depth, omegaX, omegaY, omegaZ,
     # Adjust depth based on reference point
     if uppercase(DepthRef) == "T"
         aV = (Zt - Zb) / 2
-        depth = depth + aV  # Note that dC = dT + aV!
+        depth = depth + aV  # Note that dC = depth + aV!
         Ztop = Zt - aV
     elseif uppercase(DepthRef) == "C"
         Ztop = Zt
