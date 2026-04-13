@@ -7,10 +7,15 @@ using GeoParams
 export m, Pa, deg, NoUnits, GeoUnit, C, km, Pas, GEO_units, SI_units, NO_units 
 export nondimensionalize, dimensionalize, UnitValue, Value
 
-abstract type AbstractSill{N,_T} <: AbstractMaterialParam end  
+abstract type AbstractSill{N,_T} <: AbstractMaterialParam end
 export AbstractSill
 
 include("Utils.jl")
 include("PennyShapedSills.jl")
+
+# Extensible entry points — implemented by optional extensions
+function inject_sill! end
+function plot_sill end
+export inject_sill!, plot_sill
 
 end # module InjectSills
