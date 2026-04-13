@@ -147,10 +147,10 @@ When [GeophysicalModelGenerator](https://github.com/JuliaGeodynamics/Geophysical
 using InjectSills, GeophysicalModelGenerator
 
 # Build a CartData surface (flat, at sea level)
-nx, ny = 201, 201
-x2D = [xi for xi in range(-100.0, 100.0, length=nx), _ in 1:ny]  # km
-y2D = [yi for _ in 1:nx, yi in range(-100.0, 100.0, length=ny)]
-z2D = zeros(nx, ny)   # km; replace with topography if available
+nx, ny, nz = 201, 201, 1
+x2D = [xi for xi in range(-100.0, 100.0, length=nx), _ in 1:ny,  _ in 1:nz]  # km
+y2D = [yi for _ in 1:nx, yi in range(-100.0, 100.0, length=ny),  _ in 1:nz]
+z2D = zeros(nx, ny, nz)   # km; replace with topography if available
 surf = CartData(x2D, y2D, z2D, (Elevation = z2D,))
 
 # Define a source
@@ -162,9 +162,10 @@ src = MogiSphere(
 # Option 1 — return displacement arrays (metres), useful for inversion
 Ux, Uy, Uz = surface_displacement(src, surf)
 
-# Option 2 — add displacement as new fields to the CartData
+# Option 2 — add displacement as a vector field to the CartData
 surf_out = surface_displacement(src, surf; add_fields = true)
-# surf_out.fields.Ux, .Uy, .Uz now available (metres)
+# surf_out.fields.Displacement_m = (Ux, Uy, Uz) tuple in metres
+# components: [1] = Ux, [2] = Uy, [3] = Uz
 ```
 
-The `add_fields = true` form preserves all existing fields in `surf` and appends `:Ux`, `:Uy`, `:Uz`. The plain array form is preferable for inversion workflows where you want to avoid constructing new `CartData` objects at each iteration.
+The `add_fields = true` form preserves all existing fields in `surf` and appends `:Displacement_m` as a `(Ux, Uy, Uz)` tuple — consistent with the GMG convention for vector fields. The plain array form is preferable for inversion workflows where you want to avoid constructing new `CartData` objects at each iteration.
