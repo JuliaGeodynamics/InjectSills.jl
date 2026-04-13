@@ -169,3 +169,7 @@ surf_out = surface_displacement(src, surf; add_fields = true)
 ```
 
 The `add_fields = true` form preserves all existing fields in `surf` and appends `:Displacement_m` as a `(Ux, Uy, Uz)` tuple — consistent with the GMG convention for vector fields. The plain array form is preferable for inversion workflows where you want to avoid constructing new `CartData` objects at each iteration.
+
+A working example for the Galapagos is provided [here](https://github.com/JuliaGeodynamics/InjectSills.jl/blob/main/examples/example_GMG.jl), which looks like:
+
+![Galapagos_Deformation](Galapagos_Deformation.png)
