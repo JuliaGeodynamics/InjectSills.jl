@@ -75,6 +75,11 @@
 # arne.spang@uni-bayreuth.de
 
 using LinearAlgebra
+using Adapt
+import Base.show
+import GeoParams: isdimensional
+
+export FiniteEllipsoidalCavity
 
 """
     fECM(X, Y, X0, Y0, depth, omegaX, omegaY, omegaZ, ax, ay, az, p, mu, lambda, DepthRef; Nmax=5e3, Cr=14)
@@ -1144,6 +1149,183 @@ function SolveQuadraticVec(A, B, C)
     # In this particular problem D cannot be negative!
     x1[D .< 0] .= 0
     x2[D .< 0] .= 0
-    
+
     return x1, x2
+end
+
+
+# =========================================================================
+# FiniteEllipsoidalCavity struct and interface
+# =========================================================================
+
+"""
+    FiniteEllipsoidalCavity{_T}
+
+Uniformly-pressurized finite ellipsoidal cavity in an elastic half-space
+(Nikkhoo & Rivalta, 2023).
+
+Parameters:
+===
+- `Center::Point{3,_T}` - centre of ellipsoid in EFCS (X0, Y0, -depth) [m]
+- `ax`, `ay`, `az`      - semi-axes along X, Y, Z before rotation [m]
+- `Angle::Vec{3,_T}`    - clockwise rotation angles (omegaX, omegaY, omegaZ) [degrees]
+- `ΔP`                  - pressure on cavity walls [Pa]
+- `mu`                  - shear modulus (Lamé μ) [Pa]
+- `lambda`              - Lamé constant λ [Pa]
+- `Nmax`                - maximum number of point CDMs (default: 5000)
+- `Cr`                  - grid spacing parameter (default: 14)
+
+Reference:
+===
+  Nikkhoo, M., Rivalta, E. (2023): Surface deformations and gravity changes
+  caused by pressurized finite ellipsoidal cavities.
+  Geophys. J. Int., doi:10.1093/gji/ggac351
+"""
+struct FiniteEllipsoidalCavity{_T, U1, U2, U3} <: AbstractSill{3, _T}
+    Center::GeoUnit{Point{3, _T}, U1}
+    ax::GeoUnit{_T, U1}
+    ay::GeoUnit{_T, U1}
+    az::GeoUnit{_T, U1}
+    Angle::GeoUnit{Vec{3, _T}, U2}
+    ΔP::GeoUnit{_T, U3}
+    mu::GeoUnit{_T, U3}
+    lambda::GeoUnit{_T, U3}
+    Nmax::Int
+    Cr::Int
+end
+
+function FiniteEllipsoidalCavity(
+    Center, ax, ay, az, Angle, ΔP, mu, lambda, Nmax=5000, Cr=14
+)
+    return FiniteEllipsoidalCavity(
+        convert(GeoUnit, Center),
+        convert(GeoUnit, ax),
+        convert(GeoUnit, ay),
+        convert(GeoUnit, az),
+        convert(GeoUnit, Angle),
+        convert(GeoUnit, ΔP),
+        convert(GeoUnit, mu),
+        convert(GeoUnit, lambda),
+        Int(Nmax), Int(Cr),
+    )
+end
+
+"""
+    FiniteEllipsoidalCavity(; Center, ax, ay, az, Angle, ΔP, mu, lambda, Nmax=5000, Cr=14)
+
+Keyword constructor. `Center` uses signed z (negative = depth), e.g.
+`Center = Point3(0.0, 0.0, -10250.0)*m`.
+"""
+function FiniteEllipsoidalCavity(;
+    Center = Point3(0.0, 0.0, -10250.0) * m,
+    ax     = 550.0m,
+    ay     = 550.0m,
+    az     = 3750.0m,
+    Angle  = Vec{3}(0.0, 0.0, 0.0) * NoUnits,
+    ΔP     = 18.8e6Pa,
+    mu     = 10e9Pa,
+    lambda = 10e9Pa,
+    Nmax   = 5000,
+    Cr     = 14,
+)
+    return FiniteEllipsoidalCavity(Center, ax, ay, az, Angle, ΔP, mu, lambda, Nmax, Cr)
+end
+
+Adapt.@adapt_structure FiniteEllipsoidalCavity
+
+isdimensional(fec::FiniteEllipsoidalCavity) = isdimensional(fec.mu)
+
+function GeoParams.nondimensionalize(fec::FiniteEllipsoidalCavity, c::GeoParams.GeoUnits)
+    return FiniteEllipsoidalCavity(
+        nondimensionalize(fec.Center, c),
+        nondimensionalize(fec.ax, c),
+        nondimensionalize(fec.ay, c),
+        nondimensionalize(fec.az, c),
+        nondimensionalize(fec.Angle, c),
+        nondimensionalize(fec.ΔP, c),
+        nondimensionalize(fec.mu, c),
+        nondimensionalize(fec.lambda, c),
+        fec.Nmax, fec.Cr,
+    )
+end
+
+function show(io::IO, fec::FiniteEllipsoidalCavity)
+    label = isdimensional(fec) ? "dimensional units" : "nondimensional"
+    println(io, "Finite ellipsoidal cavity ($label):")
+    println(io, "   Center          : $((fec.Center.val...,).*fec.Center.unit)")
+    println(io, "   Semi-axes (x,y,z): $(UnitValue(fec.ax)), $(UnitValue(fec.ay)), $(UnitValue(fec.az))")
+    println(io, "   Rotation angles  : $((fec.Angle.val...,))")
+    println(io, "   Pressure         : $(UnitValue(fec.ΔP))")
+    println(io, "   Shear modulus    : $(UnitValue(fec.mu))")
+    println(io, "   Lamé λ           : $(UnitValue(fec.lambda))")
+    println(io, "   Nmax / Cr        : $(fec.Nmax) / $(fec.Cr)")
+    return nothing
+end
+
+
+# ---- hostrock_displacement -----------------------------------------------
+
+"""
+    ue, un, uv, dV, DV, Ns = hostrock_displacement(fec::FiniteEllipsoidalCavity, X, Y)
+
+Surface displacement arrays at observation coordinates `X`, `Y`.
+Returns East (`ue`), North (`un`), and vertical (`uv`) components,
+plus volume change `dV`, potency `DV`, and number of point CDMs `Ns`.
+"""
+function hostrock_displacement(
+    fec::FiniteEllipsoidalCavity, X::AbstractArray, Y::AbstractArray
+)
+    GeoParams.@unpack_val Center, ax, ay, az, Angle, ΔP, mu, lambda = fec
+
+    X0     = Center[1]
+    Y0     = Center[2]
+    depth  = -Center[3]
+    omegaX, omegaY, omegaZ = Angle[1], Angle[2], Angle[3]
+
+    return fECM(X, Y, X0, Y0, depth, omegaX, omegaY, omegaZ,
+                ax, ay, az, ΔP, mu, lambda, "C";
+                Nmax=fec.Nmax, Cr=fec.Cr)
+end
+
+"""
+    d = hostrock_displacement(fec::FiniteEllipsoidalCavity, p::Point{3,_T})
+
+Surface displacement at a single observation point `p`.
+Only the horizontal coordinates `p[1]`, `p[2]` are used (surface model).
+Returns a `Vec3` (East, North, vertical).
+"""
+function hostrock_displacement(fec::FiniteEllipsoidalCavity, p::Point{3, _T}) where _T
+    ue, un, uv, _, _, _ = hostrock_displacement(fec, [p[1]], [p[2]])
+    return Vec3{_T}(ue[1], un[1], uv[1])
+end
+
+
+# ---- inside --------------------------------------------------------------
+
+"""
+    inside(p::Point{3,_T}, fec::FiniteEllipsoidalCavity{3,_T})
+
+Returns `true` if `p` is inside the (possibly rotated) ellipsoidal cavity.
+"""
+function inside(p::Point{3, _T}, fec::FiniteEllipsoidalCavity) where _T
+    GeoParams.@unpack_val Center, ax, ay, az, Angle = fec
+
+    omegaX, omegaY, omegaZ = Angle[1], Angle[2], Angle[3]
+
+    Rx = [1  0              0;
+          0  cosd(omegaX)   sind(omegaX);
+          0 -sind(omegaX)   cosd(omegaX)]
+    Ry = [cosd(omegaY)  0  -sind(omegaY);
+          0             1   0;
+          sind(omegaY)  0   cosd(omegaY)]
+    Rz = [cosd(omegaZ)   sind(omegaZ)  0;
+         -sind(omegaZ)   cosd(omegaZ)  0;
+          0              0             1]
+    R = Rz * Ry * Rx
+
+    # Relative position in EFCS, then rotate to ellipsoid body frame
+    Δ = [p[1] - Center[1], p[2] - Center[2], p[3] - Center[3]]
+    Δb = R' * Δ
+
+    return (Δb[1]/ax)^2 + (Δb[2]/ay)^2 + (Δb[3]/az)^2 <= 1
 end

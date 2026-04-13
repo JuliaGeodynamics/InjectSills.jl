@@ -13,6 +13,7 @@ export AbstractSill
 include("Utils.jl")
 include("PennyShapedSills.jl")
 include("Mogi_McTigue.jl")
+include("FiniteEllipsoidalCavity.jl")
 
 # Extensible entry points — implemented by optional extensions
 function inject_sill! end

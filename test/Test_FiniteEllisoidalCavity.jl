@@ -1,63 +1,81 @@
 using Test
+using GeoParams, InjectSills
 
-include("../src/FiniteEllipsoidalCavity.jl")
+CharDim = GEO_units(length=1000m, temperature=1000C, stress=10Pa, viscosity=1e20Pas)
 
 # make mesh
 x = 0:100:20e3
 y = 0:200:20e3
-X, Y = meshgrid(x, y)
-xl = extrema(x) ./ 1e3; yl = extrema(y) ./ 1e3
+X, Y = InjectSills.meshgrid(x, y)
 
-# cavity properties
-X0       = 0
-Y0       = 0
-depth    = 10250
-DepthRef = "C"
-omegaX   = 0
-omegaY   = 0
-omegaZ   = 0
-ax       = 550
-ay       = 550
-az       = 3750
+# ---- construct and basic properties ------------------------------------
 
-# pressure
-p        = 18.8e6
+fec = FiniteEllipsoidalCavity(
+    Center = Point3(0.0, 0.0, -10250.0)*m,
+    ax     = 550.0m,
+    ay     = 550.0m,
+    az     = 3750.0m,
+    Angle  = Vec{3}(0.0, 0.0, 0.0)*NoUnits,
+    ΔP     = 18.8e6Pa,
+    mu     = 10e9Pa,
+    lambda = 10e9Pa,
+    Nmax   = 5000,
+    Cr     = 14,
+)
+@test isdimensional(fec) == true
 
-# crust elasticity
-nu       = 0.25
-mu       = 10e9
-lambda   = (2*mu*nu)/(1-2*nu)
+fec_nd = nondimensionalize(fec, CharDim)
+@test isdimensional(fec_nd) == false
 
-# numerics
-Nmax     = 5e3
-Cr       = 14
+# ---- array displacement (matches original fECM results) ----------------
 
-# compute
-ue,un,uv,dV,DV,Ns = fECM(X,Y,X0,Y0,depth,omegaX,omegaY,omegaZ,ax,ay,az,p,mu,lambda,DepthRef;Nmax=Nmax,Cr=Cr)
+ue, un, uv, dV, DV, Ns = hostrock_displacement(fec, X, Y)
 
-# compare some results to original Matlab version
 @test all(isapprox.(extrema(uv), (8.044701021001343e-04, 0.005989663901181), rtol=1e-4))
-@test uv[1,1]          ≈ 0.004201484984743  rtol=1e-4
-@test uv[9,100]        ≈ 0.004833273685574  rtol=1e-4
-@test uv[87,46]        ≈ 0.002210474017935  rtol=1e-4
-@test maximum(ue)      ≈ 0.005037030511448  rtol=1e-4
-@test maximum(un)      ≈ 0.005037030511448  rtol=1e-4
+@test uv[1,1]      ≈ 0.004201484984743  rtol=1e-4
+@test uv[9,100]    ≈ 0.004833273685574  rtol=1e-4
+@test uv[87,46]    ≈ 0.002210474017935  rtol=1e-4
+@test maximum(ue)  ≈ 0.005037030511448  rtol=1e-4
+@test maximum(un)  ≈ 0.005037030511448  rtol=1e-4
 
-# change some parameters
-depth    = 5000
-omegaY   = 25
-omegaZ   = -65
-ax       = 850
-az       = 1500
+# ---- single-point displacement -----------------------------------------
 
-# compute again
-ue,un,uv,dV,DV,Ns = fECM(X,Y,X0,Y0,depth,omegaX,omegaY,omegaZ,ax,ay,az,p,mu,lambda,DepthRef;Nmax=Nmax,Cr=Cr)
+d = hostrock_displacement(fec, Point3(0.0, 0.0, 0.0))
+@test d[3] ≈ uv[1,1]  rtol=1e-4   # vertical at (0,0) should match grid value
 
-# compare some results to original Matlab version
-@test all(isapprox.(extrema(uv), (3.405925303200454e-04, 0.022797797325954), rtol=1e-4))
-@test uv[1,1]          ≈ 0.020284896020590  rtol=1e-4
-@test uv[9,100]        ≈ 0.004740361583832  rtol=1e-4
-@test uv[87,46]        ≈ 0.001025808009311  rtol=1e-4
-@test maximum(ue)      ≈ 0.017285000082854  rtol=1e-4
-@test maximum(un)      ≈ 0.011987093395042  rtol=1e-4
+# ---- rotated cavity ----------------------------------------------------
 
+fec2 = FiniteEllipsoidalCavity(
+    Center = Point3(0.0, 0.0, -5000.0)*m,
+    ax     = 850.0m,
+    ay     = 550.0m,
+    az     = 1500.0m,
+    Angle  = Vec{3}(0.0, 25.0, -65.0)*NoUnits,
+    ΔP     = 18.8e6Pa,
+    mu     = 10e9Pa,
+    lambda = 10e9Pa,
+)
+ue2, un2, uv2, _, _, _ = hostrock_displacement(fec2, X, Y)
+
+@test all(isapprox.(extrema(uv2), (3.405925303200454e-04, 0.022797797325954), rtol=1e-4))
+@test uv2[1,1]      ≈ 0.020284896020590  rtol=1e-4
+@test uv2[9,100]    ≈ 0.004740361583832  rtol=1e-4
+@test uv2[87,46]    ≈ 0.001025808009311  rtol=1e-4
+@test maximum(ue2)  ≈ 0.017285000082854  rtol=1e-4
+@test maximum(un2)  ≈ 0.011987093395042  rtol=1e-4
+
+# ---- inside ------------------------------------------------------------
+
+# at centre (no rotation)
+fec3 = FiniteEllipsoidalCavity(
+    Center = Point3(0.0, 0.0, -10000.0)*m,
+    ax=500.0m, ay=500.0m, az=2000.0m,
+    Angle=Vec{3}(0.0,0.0,0.0)*NoUnits,
+    ΔP=1e6Pa, mu=10e9Pa, lambda=10e9Pa,
+)
+@test inside(Point3(0.0, 0.0, -10000.0), fec3) == true   # centre
+@test inside(Point3(500.0, 0.0, -10000.0), fec3) == true  # on x boundary
+@test inside(Point3(501.0, 0.0, -10000.0), fec3) == false # just outside x
+@test inside(Point3(0.0, 0.0, -10000.0 + 2000.0), fec3) == true  # on z boundary
+@test inside(Point3(0.0, 0.0, -10000.0 + 2001.0), fec3) == false # just outside z
+@test inside(Point3(0.0, 0.0, 0.0), fec3) == false        # at surface (far above)
