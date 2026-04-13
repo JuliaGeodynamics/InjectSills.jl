@@ -140,27 +140,27 @@ sill2D = PennyShapedSill(Center=Point2(0,-15000)*m, H=100.0m, W=10000.0m, Angle=
 p=Point2(0,0.0)
 @test inside(p, sill2D) == false
 
-@test inside(Point2(0,-15e3    ), sill2D) == true
-@test inside(Point2(0,-15e3+100), sill2D) == true
-@test inside(Point2(0,-15e3+101), sill2D) == false
-@test inside(Point2(-10000,-15e3    ), sill2D) == true
-@test inside(Point2(-10001,-15e3    ), sill2D) == false
-@test inside(Point2( 10001,-15e3    ), sill2D) == false
+@test inside(Point2(0,-15e3   ),        sill2D) == true
+@test inside(Point2(0,-15e3+50),        sill2D) == true
+@test inside(Point2(0,-15e3+51),        sill2D) == false
+@test inside(Point2(-10000,-15e3    ),  sill2D) == true
+@test inside(Point2(-10001,-15e3    ),  sill2D) == false
+@test inside(Point2( 10001,-15e3    ),  sill2D) == false
 
 
 sill3D = PennyShapedSill(Center=Point3(0,0,-15000)*m, H=100.0m, W=10000.0m, Angle=Vec2(0,0))
 p=Point3(0,0.0,0)
 @test inside(p, sill3D) == false
 
-@test inside(Point3(0,0,-15e3    ), sill3D) == true
-@test inside(Point3(0,0,-15e3+100), sill3D) == true
-@test inside(Point3(0,0,-15e3+101), sill3D) == false
-@test inside(Point3(-10000,0,-15e3    ), sill3D) == true
-@test inside(Point3(-10001,0,-15e3    ), sill3D) == false
-@test inside(Point3( 10001,0,-15e3    ), sill3D) == false
-@test inside(Point3(0,-10000,-15e3    ), sill3D) == true
-@test inside(Point3(0,-10001,-15e3    ), sill3D) == false
-@test inside(Point3(0, 10001,-15e3    ), sill3D) == false
+@test inside(Point3(0,0,-15e3    ),         sill3D) == true
+@test inside(Point3(0,0,-15e3+50 ),         sill3D) == true
+@test inside(Point3(0,0,-15e3+51 ),         sill3D) == false
+@test inside(Point3(-10000,0,-15e3    ),    sill3D) == true
+@test inside(Point3(-10001,0,-15e3    ),    sill3D) == false
+@test inside(Point3( 10001,0,-15e3    ),    sill3D) == false
+@test inside(Point3(0,-10000,-15e3    ),    sill3D) == true
+@test inside(Point3(0,-10001,-15e3    ),    sill3D) == false
+@test inside(Point3(0, 10001,-15e3    ),    sill3D) == false
 
 #=
 using Plots
