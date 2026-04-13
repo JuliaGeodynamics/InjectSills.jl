@@ -138,3 +138,33 @@ For `FiniteEllipsoidalCavity` the array form additionally returns the volume cha
 ```julia
 ue, un, uv, dV, DV, Ns = hostrock_displacement(fec, X, Y)
 ```
+
+## `surface_displacement` — displacement on a GeophysicalModelGenerator surface
+
+When [GeophysicalModelGenerator](https://github.com/JuliaGeodynamics/GeophysicalModelGenerator.jl) is loaded, `surface_displacement` computes the displacement at every point of a `CartData` surface. `CartData` uses km; the conversion to metres is handled internally.
+
+```julia
+using InjectSills, GeophysicalModelGenerator
+
+# Build a CartData surface (flat, at sea level)
+nx, ny = 201, 201
+x2D = [xi for xi in range(-100.0, 100.0, length=nx), _ in 1:ny]  # km
+y2D = [yi for _ in 1:nx, yi in range(-100.0, 100.0, length=ny)]
+z2D = zeros(nx, ny)   # km; replace with topography if available
+surf = CartData(x2D, y2D, z2D, (Elevation = z2D,))
+
+# Define a source
+src = MogiSphere(
+    Center = Point3(0.0, 0.0, -5000.0)*m,
+    r = 1500.0m, ΔP = 10e6Pa, G = 10e9Pa, ν = 0.25*NoUnits,
+)
+
+# Option 1 — return displacement arrays (metres), useful for inversion
+Ux, Uy, Uz = surface_displacement(src, surf)
+
+# Option 2 — add displacement as new fields to the CartData
+surf_out = surface_displacement(src, surf; add_fields = true)
+# surf_out.fields.Ux, .Uy, .Uz now available (metres)
+```
+
+The `add_fields = true` form preserves all existing fields in `surf` and appends `:Ux`, `:Uy`, `:Uz`. The plain array form is preferable for inversion workflows where you want to avoid constructing new `CartData` objects at each iteration.

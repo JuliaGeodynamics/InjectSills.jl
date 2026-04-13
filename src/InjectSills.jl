@@ -18,6 +18,7 @@ include("FiniteEllipsoidalCavity.jl")
 # Extensible entry points — implemented by optional extensions
 function inject_sill! end
 function plot_sill end
-export inject_sill!, plot_sill
+function surface_displacement end
+export inject_sill!, plot_sill, surface_displacement
 
 end # module InjectSills
