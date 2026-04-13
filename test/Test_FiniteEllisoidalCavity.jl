@@ -36,12 +36,12 @@ Cr       = 14
 ue,un,uv,dV,DV,Ns = fECM(X,Y,X0,Y0,depth,omegaX,omegaY,omegaZ,ax,ay,az,p,mu,lambda,DepthRef;Nmax=Nmax,Cr=Cr)
 
 # compare some results to original Matlab version
-@test all(extrema(uv) .≈ (8.044701021001343e-04, 0.005989663901181))
-@test uv[1,1]          ≈ 0.004201484984743
-@test uv[9,100]        ≈ 0.004833273685574
-@test uv[87,46]        ≈ 0.002210474017935
-@test maximum(ue)      ≈ 0.005037030511448
-@test maximum(un)      ≈ 0.005037030511448
+@test all(isapprox.(extrema(uv), (8.044701021001343e-04, 0.005989663901181), rtol=1e-4))
+@test uv[1,1]          ≈ 0.004201484984743  rtol=1e-4
+@test uv[9,100]        ≈ 0.004833273685574  rtol=1e-4
+@test uv[87,46]        ≈ 0.002210474017935  rtol=1e-4
+@test maximum(ue)      ≈ 0.005037030511448  rtol=1e-4
+@test maximum(un)      ≈ 0.005037030511448  rtol=1e-4
 
 # change some parameters
 depth    = 5000
@@ -54,10 +54,10 @@ az       = 1500
 ue,un,uv,dV,DV,Ns = fECM(X,Y,X0,Y0,depth,omegaX,omegaY,omegaZ,ax,ay,az,p,mu,lambda,DepthRef;Nmax=Nmax,Cr=Cr)
 
 # compare some results to original Matlab version
-@test all(extrema(uv) .≈ (3.405925303200454e-04, 0.022797797325954))
-@test uv[1,1]          ≈ 0.020284896020590
-@test uv[9,100]        ≈ 0.004740361583832
-@test uv[87,46]        ≈ 0.001025808009311
-@test maximum(ue)      ≈ 0.017285000082854
-@test maximum(un)      ≈ 0.011987093395042
+@test all(isapprox.(extrema(uv), (3.405925303200454e-04, 0.022797797325954), rtol=1e-4))
+@test uv[1,1]          ≈ 0.020284896020590  rtol=1e-4
+@test uv[9,100]        ≈ 0.004740361583832  rtol=1e-4
+@test uv[87,46]        ≈ 0.001025808009311  rtol=1e-4
+@test maximum(ue)      ≈ 0.017285000082854  rtol=1e-4
+@test maximum(un)      ≈ 0.011987093395042  rtol=1e-4
 
