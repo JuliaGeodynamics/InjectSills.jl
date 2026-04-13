@@ -172,4 +172,4 @@ The `add_fields = true` form preserves all existing fields in `surf` and appends
 
 A working example for the Galapagos is provided [here](https://github.com/JuliaGeodynamics/InjectSills.jl/blob/main/examples/example_GMG.jl), which looks like:
 
-![Galapagos_Deformation](Galapagos_Deformation.png)
+![Galapagos_Deformation](./docs/src/assets/Galapagos_Deformation.png)
