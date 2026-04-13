@@ -721,8 +721,8 @@ function AdaptiveGrid(X0, Y0, depth, omegaX, omegaY, omegaZ,
             SF = (SFa + SFb) / 2
         end
         
-        np = SF * dT / (2 * k1 * aV)  # equation 8
-        nH = SF * dT / (2 * k1 * aH)
+        np = SF * dT ./ (2 * k1 * aV)  # equation 8
+        nH = SF * dT ./ (2 * k1 * aH)
         
         # Determine the partitioning planes: Zpar contains the Z coordinates
         Npar0 = floor(Int, log(Zbot / Ztop) / log(1 + 1 / np))  # Initial # of partitions
