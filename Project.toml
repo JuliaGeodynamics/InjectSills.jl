@@ -1,7 +1,7 @@
 name = "InjectSills"
 uuid = "2361c6a6-84b7-4f91-9ad3-fbd42a4af622"
-authors = ["Boris Kaus <kaus@uni-mainz.de>"]
 version = "0.1.0"
+authors = ["Boris Kaus <kaus@uni-mainz.de>", "Arne Spang <Arne.Spang@uni-bayreuth.de>", "Albert de Montserrat <albertdemontserratnavarro@erdw.ethz.ch>"]
 
 [deps]
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
@@ -9,5 +9,9 @@ GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
 GeoParams = "e018b62d-d9de-4a26-8697-af89c310ae38"
 GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
 JustPIC = "10dc771f-8528-4cd9-9d3b-b21b2e693339"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[compat]
+LinearAlgebra = "1.12.0"
