@@ -5,6 +5,7 @@ import GeoParams: isdimensional
 
 export PennyShapedSill, set_penny_shaped_sill, hostrock_displacement
 export inside
+export update_abstractsill
 
 
 """
@@ -225,7 +226,7 @@ function show(io::IO, g::PennyShapedSill)
     println(io, "   Maximum sill width      : $(UnitValue(g.W)) ")  
  
     return nothing
-end
+end 
 
 # Volume and area
 volume(s::PennyShapedSill) =  4/3*π*(s.W/2)*(s.W/2)*(s.H/2)     #   (equivalent 3D volume, in m^3)
@@ -372,5 +373,62 @@ function inside(p::Point{3, _T}, sill::PennyShapedSill{3,_T}) where {_T}
     distance = (p_r[1] / W)^2 + (p_r[2] / W)^2 + (p_r[3] / (H/2))^2
 
     return distance <= 1
+end
+
+
+"""
+    update_abstractsill(s::PennyShapedSill; kwargs...) -> PennyShapedSill
+
+Return a new sill identical to `s` but with the specified parameters updated.
+Accepted keyword arguments: `Center`, `Angle`, `E`, `ν`, `W`, `H`, `ΔP`, `Q`.
+
+When a single geometric parameter is changed, the remaining ones are kept
+consistent using these defaults:
+- only `W` → keep `H`, recompute `ΔP` and `Q`  (W+H branch)
+- only `H` → keep `W`, recompute `ΔP` and `Q`  (W+H branch)
+- only `ΔP` → keep `H`, recompute `W` and `Q`  (H+ΔP branch)
+- only `Q` → keep `H`, recompute `W` and `ΔP`  (H+Q branch)
+
+# Example
+```julia
+p2 = update_abstractsill(p, W = 3000.0m)
+p3 = update_abstractsill(p, W = 3000.0m, H = 200.0m)
+p4 = update_abstractsill(p, ΔP = 2e6Pa)
+```
+"""
+function update_abstractsill(s::PennyShapedSill; kwargs...)
+    kw = Dict{Symbol,Any}(kwargs)
+
+    has_W  = haskey(kw, :W)
+    has_H  = haskey(kw, :H)
+    has_ΔP = haskey(kw, :ΔP)
+    has_Q  = haskey(kw, :Q)
+
+    W  = get(kw, :W,  nothing)
+    H  = get(kw, :H,  nothing)
+    ΔP = get(kw, :ΔP, nothing)
+    Q  = get(kw, :Q,  nothing)
+
+    # Ensure a valid parameter pair reaches the constructor.
+    if !has_W && !has_H && !has_ΔP && !has_Q
+        W = UnitValue(s.W);  H = UnitValue(s.H)   # nothing changed: keep W+H
+    elseif has_W && !has_H && !has_ΔP && !has_Q
+        H = UnitValue(s.H)                          # only W: W+H branch
+    elseif has_H && !has_W && !has_ΔP && !has_Q
+        W = UnitValue(s.W)                          # only H: W+H branch
+    elseif has_ΔP && !has_W && !has_H && !has_Q
+        H = UnitValue(s.H)                          # only ΔP: H+ΔP branch
+    elseif has_Q && !has_W && !has_H && !has_ΔP
+        H = UnitValue(s.H)                          # only Q: H+Q branch
+    # Otherwise user supplied a complete valid pair; pass as-is.
+    end
+
+    return PennyShapedSill(;
+        Center = get(kw, :Center, UnitValue(s.Center)),
+        Angle  = get(kw, :Angle,  UnitValue(s.Angle)),
+        E      = get(kw, :E,      UnitValue(s.E)),
+        ν      = get(kw, :ν,      UnitValue(s.ν)),
+        W, H, ΔP, Q,
+    )
 end
 

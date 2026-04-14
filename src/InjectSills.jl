@@ -16,13 +16,19 @@ export volume, area
 
 include("Utils.jl")
 include("PennyShapedSills.jl")
+include("SquareDikes.jl")
+include("SquareDikeTopAccretion.jl")
+include("CylindricalDikeTopAccretion.jl")
+include("EllipticalIntrusions.jl")
 include("Mogi_McTigue.jl")
 include("FiniteEllipsoidalCavity.jl")
+include("DikePolygons.jl")
 
 # Extensible entry points — implemented by optional extensions
 function inject_sill! end
 function plot_sill end
 function surface_displacement end
 export inject_sill!, plot_sill, surface_displacement
+export dike_polygon
 
 end # module InjectSills
