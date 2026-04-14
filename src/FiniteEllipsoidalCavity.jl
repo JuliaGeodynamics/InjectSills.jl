@@ -1296,6 +1296,10 @@ function show(io::IO, fec::FiniteEllipsoidalCavity)
     return nothing
 end
 
+# 2D footprint area (horizontal ellipse) and 3D cavity volume.
+area(fec::FiniteEllipsoidalCavity) = π * UnitValue(fec.ax) * UnitValue(fec.ay)
+volume(fec::FiniteEllipsoidalCavity) = (4 / 3) * π * UnitValue(fec.ax) * UnitValue(fec.ay) * UnitValue(fec.az)
+
 
 # ---- hostrock_displacement -----------------------------------------------
 

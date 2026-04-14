@@ -27,6 +27,10 @@ fec = FiniteEllipsoidalCavity(
 fec_nd = nondimensionalize(fec, CharDim)
 @test isdimensional(fec_nd) == false
 
+# geometric consistency: 2D footprint area and 3D cavity volume
+@test InjectSills.area(fec) ≈ π * UnitValue(fec.ax) * UnitValue(fec.ay)
+@test InjectSills.volume(fec) ≈ (4 / 3) * π * UnitValue(fec.ax) * UnitValue(fec.ay) * UnitValue(fec.az)
+
 # copy-constructor style updates
 fec_u = FiniteEllipsoidalCavity(fec, ax=600.0m, ΔP=20e6Pa, Nmax=4000)
 @test UnitValue(fec_u.ax) ≈ 600.0m
@@ -35,6 +39,8 @@ fec_u = FiniteEllipsoidalCavity(fec, ax=600.0m, ΔP=20e6Pa, Nmax=4000)
 
 fec_u2 = FiniteEllipsoidalCavity(fec, ay=700.0)
 @test UnitValue(fec_u2.ay) ≈ 700.0m
+@test InjectSills.area(fec_u2) ≈ π * UnitValue(fec_u2.ax) * UnitValue(fec_u2.ay)
+@test InjectSills.volume(fec_u2) ≈ (4 / 3) * π * UnitValue(fec_u2.ax) * UnitValue(fec_u2.ay) * UnitValue(fec_u2.az)
 
 # ---- array displacement (matches original fECM results) ----------------
 
