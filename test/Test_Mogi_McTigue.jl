@@ -7,6 +7,9 @@ CharDim = GEO_units(length=1000m, temperature=1000C, stress=10Pa, viscosity=1e20
 
 mogi2D = MogiSphere(Center=Point2(0.0,-5000.0)*m, r=1500.0m, ΔP=10e6Pa, G=10e9Pa, ν=0.25*NoUnits)
 @test isdimensional(mogi2D) == true
+@test UnitValue(mogi2D.Lengthscale) ≈ 1500.0m
+@test UnitValue(mogi2D.BoundingBox[1]) ≈ Point2(-1500.0m, -6500.0m)
+@test UnitValue(mogi2D.BoundingBox[2]) ≈ Point2(1500.0m, -3500.0m)
 
 mogi2D_nd = nondimensionalize(mogi2D, CharDim)
 @test isdimensional(mogi2D_nd) == false
@@ -37,6 +40,8 @@ d = hostrock_displacement(mogi2D, Point2(3500.0, 0.0))
 
 # 3D sphere: axisymmetry means Ux==Uy on the x=y diagonal
 mogi3D = MogiSphere(Center=Point3(0.0,0.0,-5000.0)*m, r=1500.0m, ΔP=10e6Pa, G=10e9Pa, ν=0.25*NoUnits)
+@test UnitValue(mogi3D.BoundingBox[1]) ≈ Point3(-1500.0m, -1500.0m, -6500.0m)
+@test UnitValue(mogi3D.BoundingBox[2]) ≈ Point3(1500.0m, 1500.0m, -3500.0m)
 d3 = hostrock_displacement(mogi3D, Point3(0.0, 0.0, 0.0))
 @test d3[1] ≈ 0.0
 @test d3[2] ≈ 0.0
@@ -68,6 +73,9 @@ end
 
 mctigue2D = McTigueSphere(Center=Point2(0.0,-5000.0)*m, r=1500.0m, ΔP=10e6Pa, G=10e9Pa, ν=0.25*NoUnits)
 @test isdimensional(mctigue2D) == true
+@test UnitValue(mctigue2D.Lengthscale) ≈ 1500.0m
+@test UnitValue(mctigue2D.BoundingBox[1]) ≈ Point2(-1500.0m, -6500.0m)
+@test UnitValue(mctigue2D.BoundingBox[2]) ≈ Point2(1500.0m, -3500.0m)
 
 mctigue2D_nd = nondimensionalize(mctigue2D, CharDim)
 @test isdimensional(mctigue2D_nd) == false

@@ -178,5 +178,21 @@ point_within_box(p::Point{2, _T},W,H) where {_T} = Point2{_T}( 2*(rand()-0.5)*W,
 point_within_box(p::Point{3, _T},W,H) where {_T} = Point3{_T}( 2*(rand()-0.5)*W, 2*(rand()-0.5)*W, (rand()-0.5)*H )
 
 
+# Build an axis-aligned (unrotated) bounding box around a center point.
+function unrotated_bounding_box(center::GeoUnit{Point{2, _T}, U}, hx::_T, hz::_T) where {_T, U}
+    c = center.val
+    lower = convert(GeoUnit, Point2{_T}(c[1] - hx, c[2] - hz) * center.unit)
+    upper = convert(GeoUnit, Point2{_T}(c[1] + hx, c[2] + hz) * center.unit)
+    return (lower, upper)
+end
+
+function unrotated_bounding_box(center::GeoUnit{Point{3, _T}, U}, hx::_T, hy::_T, hz::_T) where {_T, U}
+    c = center.val
+    lower = convert(GeoUnit, Point3{_T}(c[1] - hx, c[2] - hy, c[3] - hz) * center.unit)
+    upper = convert(GeoUnit, Point3{_T}(c[1] + hx, c[2] + hy, c[3] + hz) * center.unit)
+    return (lower, upper)
+end
+
+
 # Create a named tuple from a struct, which is useful for some of the dispatches in the sill constructor
 to_nt(s) = NamedTuple{fieldnames(typeof(s))}(Tuple(getfield(s, f) for f in fieldnames(typeof(s))))

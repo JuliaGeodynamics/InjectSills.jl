@@ -40,6 +40,8 @@ struct PennyShapedSill{N, _T, N1, N2, U1, U2, U3, U4, U5} <: AbstractSill{N,_T}
     Q::GeoUnit{_T,U5}   # m^3  
     W::GeoUnit{_T,U1}   # m  
     H::GeoUnit{_T,U1}   # m
+    Lengthscale::GeoUnit{_T,U1}
+    BoundingBox::Tuple
     RotMat::GeoUnit{SMatrix{N,N,_T,N2},U4}             # rotation matrix (precomputed for efficiency)
     RotMat_negative::GeoUnit{SMatrix{N,N,_T,N2},U4}    # with negative angle 
 end
@@ -114,6 +116,16 @@ function PennyShapedSill(; W=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e
     RotMat = RotationMatrix(ustrip.(Angle))
     RotMat_negative = RotMat' 
     
+    Cg = convert(GeoUnit, Center)
+    Wg = convert(GeoUnit, W)
+    Hg = convert(GeoUnit, H)
+    Lengthscale = Hg
+    BoundingBox = if length(Center) == 2
+        unrotated_bounding_box(Cg, Wg.val, Hg.val / 2)
+    else
+        unrotated_bounding_box(Cg, Wg.val, Wg.val, Hg.val / 2)
+    end
+
     return PennyShapedSill(
         convert(GeoUnit, Center),
         convert(GeoUnit, Angle),
@@ -121,8 +133,10 @@ function PennyShapedSill(; W=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e
         convert(GeoUnit, ν),
         convert(GeoUnit, ΔP),
         convert(GeoUnit, Q),
-        convert(GeoUnit, W),
-        convert(GeoUnit, H),
+        Wg,
+        Hg,
+        Lengthscale,
+        BoundingBox,
         convert(GeoUnit, RotMat),
         convert(GeoUnit, RotMat_negative),
     )
@@ -347,11 +361,14 @@ end
     inside(p::Point{2, _T}, sill::PennyShapedSill{2,_T})
 checks if a 2D point `p` is inside the sill
 """
-function inside(p::Point{2, _T}, sill::PennyShapedSill{2,_T}) where {_T}
+function inside(p::Point{2, _T}, sill::PennyShapedSill{2,_T}; rotate::Bool=true) where {_T}
     GeoParams.@unpack_val W,H, Center, RotMat = sill;
 
-    # shift and rotate point
-    p_r =  rotate_point(p - Center, RotMat)    
+    # shift and optionally rotate point
+    p_r = p - Center
+    if rotate
+        p_r = rotate_point(p_r, RotMat)
+    end
 
     distance    = sqrt((p_r[1] / W)^2 + (p_r[2] / (H/2))^2)
 
@@ -364,11 +381,14 @@ end
     inside(p::Point{3, _T}, sill::PennyShapedSill{3,_T})
 checks if a 3D point `p` is inside the sill
 """
-function inside(p::Point{3, _T}, sill::PennyShapedSill{3,_T}) where {_T}
+function inside(p::Point{3, _T}, sill::PennyShapedSill{3,_T}; rotate::Bool=true) where {_T}
     GeoParams.@unpack_val W,H, Center, RotMat = sill;
 
-    # shift and rotate point
-    p_r =  rotate_point(p - Center, RotMat)    
+    # shift and optionally rotate point
+    p_r = p - Center
+    if rotate
+        p_r = rotate_point(p_r, RotMat)
+    end
 
     distance = (p_r[1] / W)^2 + (p_r[2] / W)^2 + (p_r[3] / (H/2))^2
 
@@ -431,4 +451,3 @@ function update_abstractsill(s::PennyShapedSill; kwargs...)
         W, H, ΔP, Q,
     )
 end
-

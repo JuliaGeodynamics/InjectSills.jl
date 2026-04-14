@@ -5,6 +5,9 @@ CharDim = GEO_units(length=1000m, temperature=1000C, stress=10Pa, viscosity=1e20
 
 s2 = SquareDikeTopAccretion(Center=Point2(0.0, -5000.0)*m, Angle=Vec1(0.0)*NoUnits, W=2000.0m, H=100.0m)
 @test isdimensional(s2) == true
+@test UnitValue(s2.Lengthscale) ≈ 100.0m
+@test UnitValue(s2.BoundingBox[1]) ≈ Point2(-1000.0m, -5050.0m)
+@test UnitValue(s2.BoundingBox[2]) ≈ Point2(1000.0m, -4950.0m)
 
 s2_nd = nondimensionalize(s2, CharDim)
 @test isdimensional(s2_nd) == false
@@ -44,6 +47,9 @@ d_rot = hostrock_displacement(s2_rot, Point2(0.0, -5010.0))
 @test inside(Point2(0.0, -4949.0), s2) == false
 
 s3 = SquareDikeTopAccretion(Center=Point3(0.0, 0.0, -5000.0)*m, Angle=Vec2(0.0, 0.0)*NoUnits, W=2000.0m, H=100.0m)
+@test UnitValue(s3.Lengthscale) ≈ 100.0m
+@test UnitValue(s3.BoundingBox[1]) ≈ Point3(-1000.0m, -1000.0m, -5050.0m)
+@test UnitValue(s3.BoundingBox[2]) ≈ Point3(1000.0m, 1000.0m, -4950.0m)
 @test inside(Point3(0.0, 0.0, -5000.0), s3) == true
 @test inside(Point3(999.0, 999.0, -5000.0), s3) == true
 @test inside(Point3(1001.0, 0.0, -5000.0), s3) == false

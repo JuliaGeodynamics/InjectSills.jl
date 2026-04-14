@@ -31,8 +31,9 @@ struct MogiSphere{N, _T, U1, U2, U3} <: AbstractSill{N, _T}
     ΔP::GeoUnit{_T, U2}
     G::GeoUnit{_T, U2}
     ν::GeoUnit{_T, U3}
+    Lengthscale::GeoUnit{_T, U1}
+    BoundingBox::Tuple
 end
-MogiSphere(args...) = MogiSphere(convert.(GeoUnit, args)...)
 Adapt.@adapt_structure MogiSphere
 
 isdimensional(s::MogiSphere) = isdimensional(s.G)
@@ -49,7 +50,15 @@ function MogiSphere(;
     G      = 10e9Pa,
     ν      = 0.25 * NoUnits,
 )
-    return MogiSphere(Center, r, ΔP, G, ν)
+    Cg = convert(GeoUnit, Center)
+    rg = convert(GeoUnit, r)
+    Lengthscale = rg
+    BoundingBox = if length(Center) == 2
+        unrotated_bounding_box(Cg, rg.val, rg.val)
+    else
+        unrotated_bounding_box(Cg, rg.val, rg.val, rg.val)
+    end
+    return MogiSphere(Cg, rg, convert(GeoUnit, ΔP), convert(GeoUnit, G), convert(GeoUnit, ν), Lengthscale, BoundingBox)
 end
 
 """
@@ -118,8 +127,9 @@ struct McTigueSphere{N, _T, U1, U2, U3} <: AbstractSill{N, _T}
     ΔP::GeoUnit{_T, U2}
     G::GeoUnit{_T, U2}
     ν::GeoUnit{_T, U3}
+    Lengthscale::GeoUnit{_T, U1}
+    BoundingBox::Tuple
 end
-McTigueSphere(args...) = McTigueSphere(convert.(GeoUnit, args)...)
 Adapt.@adapt_structure McTigueSphere
 
 isdimensional(s::McTigueSphere) = isdimensional(s.G)
@@ -134,7 +144,15 @@ function McTigueSphere(;
     G      = 10e9Pa,
     ν      = 0.25 * NoUnits,
 )
-    return McTigueSphere(Center, r, ΔP, G, ν)
+    Cg = convert(GeoUnit, Center)
+    rg = convert(GeoUnit, r)
+    Lengthscale = rg
+    BoundingBox = if length(Center) == 2
+        unrotated_bounding_box(Cg, rg.val, rg.val)
+    else
+        unrotated_bounding_box(Cg, rg.val, rg.val, rg.val)
+    end
+    return McTigueSphere(Cg, rg, convert(GeoUnit, ΔP), convert(GeoUnit, G), convert(GeoUnit, ν), Lengthscale, BoundingBox)
 end
 
 """
@@ -255,7 +273,7 @@ end
 
 Returns `true` if `p` is inside the spherical cavity.
 """
-function inside(p::Point{N, _T}, sill::MogiSphere{N, _T}) where {N, _T}
+function inside(p::Point{N, _T}, sill::MogiSphere{N, _T}; rotate::Bool=true) where {N, _T}
     GeoParams.@unpack_val r, Center = sill
     Δ = p - Center
     dist_sq = zero(_T)
@@ -270,7 +288,7 @@ end
 
 Returns `true` if `p` is inside the spherical cavity.
 """
-function inside(p::Point{N, _T}, sill::McTigueSphere{N, _T}) where {N, _T}
+function inside(p::Point{N, _T}, sill::McTigueSphere{N, _T}; rotate::Bool=true) where {N, _T}
     GeoParams.@unpack_val r, Center = sill
     Δ = p - Center
     dist_sq = zero(_T)

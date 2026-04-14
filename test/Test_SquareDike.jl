@@ -7,6 +7,9 @@ CharDim = GEO_units(length=1000m, temperature=1000C, stress=10Pa, viscosity=1e20
 
 s2 = SquareDike(Center=Point2(0.0, -5000.0)*m, Angle=Vec1(0.0)*NoUnits, W=2000.0m, H=100.0m)
 @test isdimensional(s2) == true
+@test UnitValue(s2.Lengthscale) ≈ 100.0m
+@test UnitValue(s2.BoundingBox[1]) ≈ Point2(-1000.0m, -5050.0m)
+@test UnitValue(s2.BoundingBox[2]) ≈ Point2(1000.0m, -4950.0m)
 
 s2_nd = nondimensionalize(s2, CharDim)
 @test isdimensional(s2_nd) == false
@@ -51,6 +54,11 @@ d_rot = hostrock_displacement(s2_rot, Point2(0.0, -4990.0))
 @test abs(d_rot[1]) > 1.0
 @test abs(d_rot[2]) > 1.0
 
+# rotate keyword: default applies rotation, rotate=false skips it
+p_rot_frame = Point2(900 / sqrt(2), -5000.0 - 900 / sqrt(2))
+@test inside(p_rot_frame, s2_rot) == true
+@test inside(p_rot_frame, s2_rot; rotate=false) == false
+
 # ---- inside ---------------------------------------------------------------
 
 @test inside(Point2(0.0, -5000.0), s2) == true
@@ -62,6 +70,9 @@ d_rot = hostrock_displacement(s2_rot, Point2(0.0, -4990.0))
 # ---- 3D -------------------------------------------------------------------
 
 s3 = SquareDike(Center=Point3(0.0, 0.0, -5000.0)*m, Angle=Vec2(0.0, 0.0)*NoUnits, W=2000.0m, H=100.0m)
+@test UnitValue(s3.Lengthscale) ≈ 100.0m
+@test UnitValue(s3.BoundingBox[1]) ≈ Point3(-1000.0m, -1000.0m, -5050.0m)
+@test UnitValue(s3.BoundingBox[2]) ≈ Point3(1000.0m, 1000.0m, -4950.0m)
 
 @test inside(Point3(0.0, 0.0, -5000.0), s3) == true
 @test inside(Point3(999.0, 999.0, -5000.0), s3) == true

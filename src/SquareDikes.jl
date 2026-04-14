@@ -22,6 +22,8 @@ struct SquareDike{N, _T, N1, N2, U1, U2, U3} <: AbstractSill{N, _T}
     Angle::GeoUnit{Vec{N1, _T}, U2}
     W::GeoUnit{_T, U1}
     H::GeoUnit{_T, U1}
+    Lengthscale::GeoUnit{_T, U1}
+    BoundingBox::Tuple
     RotMat::GeoUnit{SMatrix{N, N, _T, N2}, U3}
 end
 Adapt.@adapt_structure SquareDike
@@ -41,13 +43,16 @@ function SquareDike(;
 )
     @assert length(Center) == length(Angle) + 1
     RotMat = RotationMatrix(ustrip.(Angle))
-    return SquareDike(
-        convert(GeoUnit, Center),
-        convert(GeoUnit, Angle),
-        convert(GeoUnit, W),
-        convert(GeoUnit, H),
-        convert(GeoUnit, RotMat),
-    )
+    Cg = convert(GeoUnit, Center)
+    Wg = convert(GeoUnit, W)
+    Hg = convert(GeoUnit, H)
+    Lengthscale = Hg
+    BoundingBox = if length(Center) == 2
+        unrotated_bounding_box(Cg, Wg.val / 2, Hg.val / 2)
+    else
+        unrotated_bounding_box(Cg, Wg.val / 2, Wg.val / 2, Hg.val / 2)
+    end
+    return SquareDike(Cg, convert(GeoUnit, Angle), Wg, Hg, Lengthscale, BoundingBox, convert(GeoUnit, RotMat))
 end
 
 """
@@ -135,9 +140,12 @@ end
 
 Returns `true` if `p` is inside the 2D square-dike cross section.
 """
-function inside(p::Point{2, _T}, sill::SquareDike{2, _T}) where {_T}
+function inside(p::Point{2, _T}, sill::SquareDike{2, _T}; rotate::Bool=true) where {_T}
     GeoParams.@unpack_val W, H, Center, RotMat = sill
-    p_r = rotate_point(p - Center, RotMat)
+    p_r = p - Center
+    if rotate
+        p_r = rotate_point(p_r, RotMat)
+    end
     return abs(p_r[1]) <= W / 2 && abs(p_r[2]) <= H / 2
 end
 
@@ -146,9 +154,12 @@ end
 
 Returns `true` if `p` is inside the 3D square-dike volume.
 """
-function inside(p::Point{3, _T}, sill::SquareDike{3, _T}) where {_T}
+function inside(p::Point{3, _T}, sill::SquareDike{3, _T}; rotate::Bool=true) where {_T}
     GeoParams.@unpack_val W, H, Center, RotMat = sill
-    p_r = rotate_point(p - Center, RotMat)
+    p_r = p - Center
+    if rotate
+        p_r = rotate_point(p_r, RotMat)
+    end
     return abs(p_r[1]) <= W / 2 && abs(p_r[2]) <= W / 2 && abs(p_r[3]) <= H / 2
 end
 

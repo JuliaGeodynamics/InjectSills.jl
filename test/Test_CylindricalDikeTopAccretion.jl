@@ -8,6 +8,9 @@ CharDim = GEO_units(length=1000m, temperature=1000C, stress=10Pa, viscosity=1e20
 c2 = CylindricalDikeTopAccretion(Center=Point2(0.0, -5000.0)*m, Angle=Vec1(0.0)*NoUnits, W=2000.0m, H=100.0m)
 @test isdimensional(c2) == true
 @test isdimensional(nondimensionalize(c2, CharDim)) == false
+@test UnitValue(c2.Lengthscale) ≈ 100.0m
+@test UnitValue(c2.BoundingBox[1]) ≈ Point2(-1000.0m, -5050.0m)
+@test UnitValue(c2.BoundingBox[2]) ≈ Point2(1000.0m, -4950.0m)
 
 c2u = CylindricalDikeTopAccretion(c2, W=2500.0m, H=120.0m)
 @test UnitValue(c2u.W) ≈ 2500.0m
@@ -32,6 +35,9 @@ d_left = hostrock_displacement(c2, Point2(-5000.0, -5010.0))
 @test inside(Point2(1001.0, -5000.0), c2) == false
 
 c3 = CylindricalDikeTopAccretion(Center=Point3(0.0, 0.0, -5000.0)*m, Angle=Vec2(0.0, 0.0)*NoUnits, W=2000.0m, H=100.0m)
+@test UnitValue(c3.Lengthscale) ≈ 100.0m
+@test UnitValue(c3.BoundingBox[1]) ≈ Point3(-1000.0m, -1000.0m, -5050.0m)
+@test UnitValue(c3.BoundingBox[2]) ≈ Point3(1000.0m, 1000.0m, -4950.0m)
 d3 = hostrock_displacement(c3, Point3(200.0, 200.0, -5010.0))
 @test d3[1] ≈ 0.0
 @test d3[2] ≈ 0.0
@@ -45,6 +51,9 @@ d3o = hostrock_displacement(c3, Point3(1200.0, 1200.0, -5010.0))
 cf2 = CylindricalDikeTopAccretionFullModelAdvection(Center=Point2(0.0, -5000.0)*m, Angle=Vec1(0.0)*NoUnits, W=2000.0m, H=100.0m)
 @test isdimensional(cf2) == true
 @test isdimensional(nondimensionalize(cf2, CharDim)) == false
+@test UnitValue(cf2.Lengthscale) ≈ 100.0m
+@test UnitValue(cf2.BoundingBox[1]) ≈ Point2(-1000.0m, -5050.0m)
+@test UnitValue(cf2.BoundingBox[2]) ≈ Point2(1000.0m, -4950.0m)
 
 cf2u = CylindricalDikeTopAccretionFullModelAdvection(cf2, H=80.0m)
 @test UnitValue(cf2u.H) ≈ 80.0m

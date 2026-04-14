@@ -23,6 +23,9 @@ fec = FiniteEllipsoidalCavity(
     Cr     = 14,
 )
 @test isdimensional(fec) == true
+@test UnitValue(fec.Lengthscale) ≈ 3750.0m
+@test UnitValue(fec.BoundingBox[1]) ≈ Point3(-550.0m, -550.0m, -14000.0m)
+@test UnitValue(fec.BoundingBox[2]) ≈ Point3(550.0m, 550.0m, -6500.0m)
 
 fec_nd = nondimensionalize(fec, CharDim)
 @test isdimensional(fec_nd) == false
@@ -94,3 +97,14 @@ fec3 = FiniteEllipsoidalCavity(
 @test inside(Point3(0.0, 0.0, -10000.0 + 2000.0), fec3) == true  # on z boundary
 @test inside(Point3(0.0, 0.0, -10000.0 + 2001.0), fec3) == false # just outside z
 @test inside(Point3(0.0, 0.0, 0.0), fec3) == false        # at surface (far above)
+
+# rotate keyword: default applies rotation, rotate=false uses unrotated frame
+fec_rot = FiniteEllipsoidalCavity(
+    Center = Point3(0.0, 0.0, -10000.0)*m,
+    ax=800.0m, ay=300.0m, az=2000.0m,
+    Angle=Vec{3}(0.0, 0.0, 45.0)*NoUnits,
+    ΔP=1e6Pa, mu=10e9Pa, lambda=10e9Pa,
+)
+p_rot = Point3(700 / sqrt(2), -700 / sqrt(2), -10000.0)
+@test inside(p_rot, fec_rot) == true
+@test inside(p_rot, fec_rot; rotate=false) == false

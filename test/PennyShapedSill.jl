@@ -11,6 +11,9 @@ a_nd = nondimensionalize(a, CharDim)
 # Define sill with different parameters
 sill0 = PennyShapedSill()
 @test isdimensional(sill0) == true
+@test UnitValue(sill0.Lengthscale) ≈ UnitValue(sill0.H)
+@test UnitValue(sill0.BoundingBox[1])[1] ≈ UnitValue(sill0.Center)[1] - UnitValue(sill0.W)
+@test UnitValue(sill0.BoundingBox[2])[2] ≈ UnitValue(sill0.Center)[2] + UnitValue(sill0.H) / 2
 
 # test that we can nondimensionalize this
 sill0_nd = nondimensionalize(sill0, CharDim)

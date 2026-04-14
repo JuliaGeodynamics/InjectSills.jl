@@ -6,6 +6,9 @@ CharDim = GEO_units(length=1000m, temperature=1000C, stress=10Pa, viscosity=1e20
 e2 = EllipticalIntrusion(Center=Point2(0.0, -5000.0)*m, Angle=Vec1(0.0)*NoUnits, W=2000.0m, H=200.0m)
 @test isdimensional(e2) == true
 @test isdimensional(nondimensionalize(e2, CharDim)) == false
+@test UnitValue(e2.Lengthscale) ≈ 200.0m
+@test UnitValue(e2.BoundingBox[1]) ≈ Point2(-1000.0m, -5100.0m)
+@test UnitValue(e2.BoundingBox[2]) ≈ Point2(1000.0m, -4900.0m)
 
 e2u = EllipticalIntrusion(e2, W=2500.0m, H=250.0m)
 @test UnitValue(e2u.W) ≈ 2500.0m
@@ -33,8 +36,13 @@ e2r = EllipticalIntrusion(Center=Point2(0.0, -5000.0)*m, Angle=Vec1(45.0)*NoUnit
 d_rot = hostrock_displacement(e2r, Point2(200.0, -5010.0))
 @test abs(d_rot[1]) > 0.0
 @test abs(d_rot[2]) > 0.0
+@test inside(Point2(500 / sqrt(2), -5000.0 - 500 / sqrt(2)), e2r) == true
+@test inside(Point2(500 / sqrt(2), -5000.0 - 500 / sqrt(2)), e2r; rotate=false) == false
 
 e3 = EllipticalIntrusion(Center=Point3(0.0, 0.0, -5000.0)*m, Angle=Vec2(0.0, 0.0)*NoUnits, W=2000.0m, H=200.0m)
+@test UnitValue(e3.Lengthscale) ≈ 200.0m
+@test UnitValue(e3.BoundingBox[1]) ≈ Point3(-1000.0m, -1000.0m, -5100.0m)
+@test UnitValue(e3.BoundingBox[2]) ≈ Point3(1000.0m, 1000.0m, -4900.0m)
 @test inside(Point3(0.0, 0.0, -5000.0), e3) == true
 @test inside(Point3(1000.0, 0.0, -5000.0), e3) == true
 @test inside(Point3(1001.0, 0.0, -5000.0), e3) == false

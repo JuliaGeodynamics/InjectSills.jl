@@ -61,6 +61,7 @@ function main()
     particles = init_particles(backend, nxcell, max_xcell, min_xcell, xvi...)
 
     sill2D = PennyShapedSill(Center=Point2(0, -5000)*m, H=40.0m, W=2000.0m, Angle=Vec1(30))
+    sill2D = MogiSphere(Center=Point2(0, -5000)*m, r=1500.0m)
 
     Dx, Dy = init_cell_arrays(particles, Val(2))
     inject_sill!(particles, Dx, Dy, xvi, sill2D)

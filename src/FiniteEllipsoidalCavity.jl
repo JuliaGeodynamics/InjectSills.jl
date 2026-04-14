@@ -1186,6 +1186,8 @@ struct FiniteEllipsoidalCavity{_T, U1, U2, U3} <: AbstractSill{3, _T}
     ax::GeoUnit{_T, U1}
     ay::GeoUnit{_T, U1}
     az::GeoUnit{_T, U1}
+    Lengthscale::GeoUnit{_T, U1}
+    BoundingBox::Tuple
     Angle::GeoUnit{Vec{3, _T}, U2}
     ΔP::GeoUnit{_T, U3}
     mu::GeoUnit{_T, U3}
@@ -1197,11 +1199,19 @@ end
 function FiniteEllipsoidalCavity(
     Center, ax, ay, az, Angle, ΔP, mu, lambda, Nmax=5000, Cr=14
 )
+    Cg  = convert(GeoUnit, Center)
+    axg = convert(GeoUnit, ax)
+    ayg = convert(GeoUnit, ay)
+    azg = convert(GeoUnit, az)
+    Lengthscale = azg
+    BoundingBox = unrotated_bounding_box(Cg, axg.val, ayg.val, azg.val)
     return FiniteEllipsoidalCavity(
-        convert(GeoUnit, Center),
-        convert(GeoUnit, ax),
-        convert(GeoUnit, ay),
-        convert(GeoUnit, az),
+        Cg,
+        axg,
+        ayg,
+        azg,
+        Lengthscale,
+        BoundingBox,
         convert(GeoUnit, Angle),
         convert(GeoUnit, ΔP),
         convert(GeoUnit, mu),
@@ -1345,7 +1355,7 @@ end
 
 Returns `true` if `p` is inside the (possibly rotated) ellipsoidal cavity.
 """
-function inside(p::Point{3, _T}, fec::FiniteEllipsoidalCavity) where _T
+function inside(p::Point{3, _T}, fec::FiniteEllipsoidalCavity; rotate::Bool=true) where _T
     GeoParams.@unpack_val Center, ax, ay, az, Angle = fec
 
     omegaX, omegaY, omegaZ = Angle[1], Angle[2], Angle[3]
@@ -1363,7 +1373,7 @@ function inside(p::Point{3, _T}, fec::FiniteEllipsoidalCavity) where _T
 
     # Relative position in EFCS, then rotate to ellipsoid body frame
     Δ = [p[1] - Center[1], p[2] - Center[2], p[3] - Center[3]]
-    Δb = R' * Δ
+    Δb = rotate ? (R' * Δ) : Δ
 
     return (Δb[1]/ax)^2 + (Δb[2]/ay)^2 + (Δb[3]/az)^2 <= 1
 end
