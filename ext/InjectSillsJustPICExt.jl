@@ -4,14 +4,14 @@ using InjectSills
 using JustPIC, JustPIC._2D, JustPIC._3D
 
 """
-    inject_sill!(particles, Dx, Dy, xvi, sill::AbstractSill{2,_T})
+    inject_sill!(particles, Dx, Dy, xvi, sill::AbstractSill{2,_T}; force_inject=false)
 
 Advect JustPIC `particles` by the displacement field induced by `sill`.
 `Dx` and `Dy` are pre-allocated `CellArray`s (from `init_cell_arrays`).
 `xvi` is the tuple of nodal-vertex ranges `(xv, yv)`.
 """
 function InjectSills.inject_sill!(
-    particles, Dx, Dy, xvi, sill::AbstractSill{2,_T}
+    particles, Dx, Dy, xvi, sill::AbstractSill{2,_T}; force_inject=false
 ) where {_T}
     dx = xvi[1][2] - xvi[1][1]
     dy = xvi[2][2] - xvi[2][1]
@@ -42,21 +42,26 @@ function InjectSills.inject_sill!(
     for _ in 1:N
         particles.coords[1].data .+= Dx.data .* fac
         particles.coords[2].data .+= Dy.data .* fac
-        move_particles!(particles, xvi, (Dx, Dy))
+        JustPIC._2D.move_particles!(particles, xvi, (Dx, Dy))
+    end
+
+    # Force inject particles here
+    if force_inject
+
     end
 
     return nothing
 end
 
 """
-    inject_sill!(particles, Dx, Dy, Dz, xvi, sill::AbstractSill{3,_T})
+    inject_sill!(particles, Dx, Dy, Dz, xvi, sill::AbstractSill{3,_T}; force_inject=false)
 
 Advect JustPIC `particles` by the displacement field induced by `sill`.
 `Dx`, `Dy`, and `Dz` are pre-allocated `CellArray`s.
 `xvi` is the tuple of nodal-vertex ranges `(xv, yv, zv)`.
 """
 function InjectSills.inject_sill!(
-    particles, Dx, Dy, Dz, xvi, sill::AbstractSill{3,_T}
+    particles, Dx, Dy, Dz, xvi, sill::AbstractSill{3,_T}; force_inject=false
 ) where {_T}
     dx = xvi[1][2] - xvi[1][1]
     dy = xvi[2][2] - xvi[2][1]
@@ -92,7 +97,13 @@ function InjectSills.inject_sill!(
         particles.coords[1].data .+= Dx.data .* fac
         particles.coords[2].data .+= Dy.data .* fac
         particles.coords[3].data .+= Dz.data .* fac
-        move_particles!(particles, xvi, (Dx, Dy, Dz))
+        JustPIC._3D.move_particles!(particles, xvi, (Dx, Dy, Dz))
+    end
+
+
+    # Force inject particles here
+    if force_inject
+
     end
 
     return nothing

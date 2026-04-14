@@ -43,3 +43,23 @@ end
     @test maximum(z) ≈ -1900.0 atol=1e-8
     @test minimum(z) ≈ -2100.0 atol=1e-8
 end
+
+@testset "dike_polygon penny-shaped sill" begin
+    s = PennyShapedSill(Center=Point2(10.0, -5000.0)*m, W=1000.0m, H=200.0m, Angle=Vec1(0.0)*NoUnits)
+    poly = dike_polygon(s, 101)
+    x, z = poly
+    @test length(x) == 101
+    @test length(z) == 101
+    @test maximum(x) ≈ 1010.0 atol=1e-8
+    @test minimum(x) ≈ -990.0 atol=1e-8
+    @test maximum(z) ≈ -4900.0 atol=1e-8
+    @test minimum(z) ≈ -5100.0 atol=1e-8
+
+    srot = PennyShapedSill(Center=Point2(10.0, -5000.0)*m, W=1000.0m, H=200.0m, Angle=Vec1(90.0)*NoUnits)
+    polyrot = dike_polygon(srot, 101)
+    xr, zr = polyrot
+    @test maximum(xr) ≈ 110.0 atol=1e-6
+    @test minimum(xr) ≈ -90.0 atol=1e-6
+    @test maximum(zr) ≈ -4000.0 atol=1e-6
+    @test minimum(zr) ≈ -6000.0 atol=1e-6
+end

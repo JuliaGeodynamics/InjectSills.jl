@@ -34,20 +34,15 @@ function maybe_plot(px, py, Dy, sill2D)
 
         inside_vec = zeros(Int32, size(px))
         for I in eachindex(px)
-            inside_vec[I] = inside(Point2(px[I], py[I]), sill2D)
+            if !isnan(px[I]) && !isnan(py[I])
+                inside_vec[I] = inside(Point2(px[I], py[I]), sill2D)
+            end
         end
         ind = findall(inside_vec .== 1)
         scatter!(ax, px[ind]/1e3, py[ind]/1e3, markersize=15)
 
-        n = 100
-        theta = range(0, 2π, length=n)
-        x = sill2D.W.val .* cos.(theta)
-        y = (sill2D.H.val / 2) .* sin.(theta)
-        polygon = Point2.(x, y)
-        for I in eachindex(polygon)
-            polygon[I] = InjectSills.rotate_point(polygon[I], sill2D.RotMat.val') + sill2D.Center.val
-        end
-        lines!(ax, polygon ./ 1e3, color=:red)
+        x_poly, z_poly = dike_polygon(sill2D, 100)
+        lines!(ax, x_poly ./ 1e3, z_poly ./ 1e3, color=:red)
 
         display(fig)
     catch err
@@ -65,7 +60,7 @@ function main()
 
     particles = init_particles(backend, nxcell, max_xcell, min_xcell, xvi...)
 
-    sill2D = PennyShapedSill(Center=Point2(0, -5000)*m, H=40.0m, W=200.0m, Angle=Vec1(0))
+    sill2D = PennyShapedSill(Center=Point2(0, -5000)*m, H=40.0m, W=2000.0m, Angle=Vec1(30))
 
     Dx, Dy = init_cell_arrays(particles, Val(2))
     inject_sill!(particles, Dx, Dy, xvi, sill2D)
@@ -75,8 +70,9 @@ function main()
 
     println("JustPIC example ran successfully.")
     println("Particles: $(length(px))")
-    println("Mean Dx: $(sum(Dx.data) / length(Dx.data))")
-    println("Mean Dy: $(sum(Dy.data) / length(Dy.data))")
+    ind = findall(.!isnan.(px) .& .!isnan.(py))
+    println("Mean Dx: $(sum(Dx.data[ind]) / length(Dx.data[ind]))")
+    println("Mean Dy: $(sum(Dy.data[ind]) / length(Dy.data[ind]))")
 
     maybe_plot(px, py, Dy, sill2D)
     return nothing

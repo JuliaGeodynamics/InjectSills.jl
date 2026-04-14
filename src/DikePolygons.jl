@@ -34,3 +34,19 @@ function dike_polygon(sill::EllipticalIntrusion{N, _T}, nump::Integer=101) where
     z = Center[N] .- sin.(p) .* (H / 2)
     return [collect(x), collect(z)]
 end
+
+function dike_polygon(sill::PennyShapedSill{2, _T}, nump::Integer=101) where {_T}
+    GeoParams.@unpack_val W, H, Center = sill
+    n = max(4, Int(nump))
+    p = range(zero(_T), stop=2 * π, length=n)
+
+    poly = Vector{Point2{_T}}(undef, n)
+    for (i, θ) in enumerate(p)
+        local_pt = Point2{_T}(cos(θ) * W, sin(θ) * (H / 2))
+        poly[i] = rotate_point(local_pt, sill.RotMat.val') + Center
+    end
+
+    x = [pt[1] for pt in poly]
+    z = [pt[2] for pt in poly]
+    return [x, z]
+end
