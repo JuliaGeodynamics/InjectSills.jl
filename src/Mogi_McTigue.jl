@@ -52,6 +52,35 @@ function MogiSphere(;
     return MogiSphere(Center, r, ΔP, G, ν)
 end
 
+"""
+    MogiSphere(s::MogiSphere; kwargs...)
+
+Create a new `MogiSphere` from an existing one by overriding any subset of
+`Center`, `r`, `ΔP`, `G`, `ν`.
+"""
+function MogiSphere(s::MogiSphere; kwargs...)
+    valid = (:Center, :r, :ΔP, :G, :ν)
+    all(k -> k in valid, keys(kwargs)) ||
+        error("Invalid keyword for MogiSphere(s; ...). Valid keys are: $(valid)")
+
+    base = (
+        Center = UnitValue(s.Center),
+        r      = UnitValue(s.r),
+        ΔP     = UnitValue(s.ΔP),
+        G      = UnitValue(s.G),
+        ν      = UnitValue(s.ν),
+    )
+
+    kw = Dict{Symbol,Any}(kwargs)
+    for sym in (:r, :ΔP, :G)
+        if haskey(kw, sym) && kw[sym] isa Number && !(kw[sym] isa typeof(oneunit(getproperty(base, sym))))
+            kw[sym] = kw[sym] * oneunit(getproperty(base, sym))
+        end
+    end
+
+    return MogiSphere(; merge(base, (; kw...))...)
+end
+
 function show(io::IO, s::MogiSphere)
     label = isdimensional(s) ? "dimensional units" : "nondimensional"
     println(io, "Mogi sphere ($label):")
@@ -62,6 +91,10 @@ function show(io::IO, s::MogiSphere)
     println(io, "   Poisson's ratio : $(UnitValue(s.ν))")
     return nothing
 end
+
+# Volume and area
+volume(s::MogiSphere)   =  (4/3) * π * UnitValue(s.r)^3   # equivalent 3D volume
+area(s::MogiSphere)     =          π * UnitValue(s.r)^2   # 2D cross-sectional area
 
 
 # ---- McTigueSphere -------------------------------------------------------
@@ -104,6 +137,35 @@ function McTigueSphere(;
     return McTigueSphere(Center, r, ΔP, G, ν)
 end
 
+"""
+    McTigueSphere(s::McTigueSphere; kwargs...)
+
+Create a new `McTigueSphere` from an existing one by overriding any subset of
+`Center`, `r`, `ΔP`, `G`, `ν`.
+"""
+function McTigueSphere(s::McTigueSphere; kwargs...)
+    valid = (:Center, :r, :ΔP, :G, :ν)
+    all(k -> k in valid, keys(kwargs)) ||
+        error("Invalid keyword for McTigueSphere(s; ...). Valid keys are: $(valid)")
+
+    base = (
+        Center = UnitValue(s.Center),
+        r      = UnitValue(s.r),
+        ΔP     = UnitValue(s.ΔP),
+        G      = UnitValue(s.G),
+        ν      = UnitValue(s.ν),
+    )
+
+    kw = Dict{Symbol,Any}(kwargs)
+    for sym in (:r, :ΔP, :G)
+        if haskey(kw, sym) && kw[sym] isa Number && !(kw[sym] isa typeof(oneunit(getproperty(base, sym))))
+            kw[sym] = kw[sym] * oneunit(getproperty(base, sym))
+        end
+    end
+
+    return McTigueSphere(; merge(base, (; kw...))...)
+end
+
 function show(io::IO, s::McTigueSphere)
     label = isdimensional(s) ? "dimensional units" : "nondimensional"
     println(io, "McTigue sphere ($label):")
@@ -115,6 +177,9 @@ function show(io::IO, s::McTigueSphere)
     return nothing
 end
 
+# Volume and area
+volume(s::McTigueSphere)   =  (4/3) * π * UnitValue(s.r)^3   # equivalent 3D volume
+area(s::McTigueSphere)     =          π * UnitValue(s.r)^2   # 2D cross-sectional area
 
 # ---- hostrock_displacement -----------------------------------------------
 
@@ -213,4 +278,39 @@ function inside(p::Point{N, _T}, sill::McTigueSphere{N, _T}) where {N, _T}
         dist_sq += Δ[i]^2
     end
     return dist_sq <= r^2
+end
+
+
+"""
+    update_abstractsill(s::MogiSphere; kwargs...) -> MogiSphere
+    update_abstractsill(s::McTigueSphere; kwargs...) -> McTigueSphere
+
+Return a new sphere identical to `s` but with the specified parameters updated.
+Accepted keyword arguments: `Center`, `r`, `ΔP`, `G`, `ν`.
+
+# Example
+```julia
+s2 = update_abstractsill(s, r = 2000.0m, ΔP = 15e6Pa)
+```
+"""
+function update_abstractsill(s::MogiSphere; kwargs...)
+    params = (
+        Center = UnitValue(s.Center),
+        r      = UnitValue(s.r),
+        ΔP     = UnitValue(s.ΔP),
+        G      = UnitValue(s.G),
+        ν      = UnitValue(s.ν),
+    )
+    return MogiSphere(; merge(params, kwargs)...)
+end
+
+function update_abstractsill(s::McTigueSphere; kwargs...)
+    params = (
+        Center = UnitValue(s.Center),
+        r      = UnitValue(s.r),
+        ΔP     = UnitValue(s.ΔP),
+        G      = UnitValue(s.G),
+        ν      = UnitValue(s.ν),
+    )
+    return McTigueSphere(; merge(params, kwargs)...)
 end

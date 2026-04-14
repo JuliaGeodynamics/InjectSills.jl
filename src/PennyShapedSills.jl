@@ -42,7 +42,6 @@ struct PennyShapedSill{N, _T, N1, N2, U1, U2, U3, U4, U5} <: AbstractSill{N,_T}
     RotMat::GeoUnit{SMatrix{N,N,_T,N2},U4}             # rotation matrix (precomputed for efficiency)
     RotMat_negative::GeoUnit{SMatrix{N,N,_T,N2},U4}    # with negative angle 
 end
-PennyShapedSill(args...) = PennyShapedSill(convert.(GeoUnit, args)...)
 Adapt.@adapt_structure PennyShapedSill
 
 isdimensional(PennyShapedSill) = isdimensional(PennyShapedSill.E)
@@ -55,7 +54,8 @@ You can give various combinations of parameters to define the sill:
 - `ΔP` and `H` 
 - `H` and `Q`
 - `W` and `H`
-- `W` and `Q` 
+- `W` and `Q`
+- `W` and `ΔP`
 """
 function PennyShapedSill(; W=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e10Pa, ν=0.3*NoUnits, Angle=Vec1(0.0)*Pas, Center=Point2(0.0)*m)
     @assert length(Center)==length(Angle)+1
@@ -67,9 +67,13 @@ function PennyShapedSill(; W=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e
         H   =  8*(1-ν^2)*ΔP*W/(π*E)
 
     elseif isnothing(W) && isnothing(Q) && !isnothing(ΔP) && isnothing(H)
-        Q   =  1000.0*m^3    
-        W   =  (3*E*Q/(16*(1-ν^2)*ΔP))^(1.0/3.0)
+        # Use the default reference width and recompute H and Q for the
+        # user-provided overpressure.
+        Q_ref = 1000.0*m^3
+        ΔP_ref = 1e6*Pa
+        W   =  (3*E*Q_ref/(16*(1-ν^2)*ΔP_ref))^(1.0/3.0)
         H   =  8*(1-ν^2)*ΔP*W/(π*E)
+        Q   =  16*(1-ν^2)*ΔP*W^3/(3*E)
 
     elseif isnothing(W) && !isnothing(Q) && !isnothing(ΔP) && isnothing(H)
         W   =  (3*E*Q/(16*(1-ν^2)*ΔP))^(1.0/3.0)
@@ -88,6 +92,10 @@ function PennyShapedSill(; W=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e
         ΔP = (π * E * H) / (8 * (1 - ν^2) * W)
         Q = (2 * π * H * W^2) / 3
 
+    elseif !isnothing(W) && !isnothing(ΔP)
+        H = 8 * (1 - ν^2) * ΔP * W / (π * E)
+        Q = 16 * (1 - ν^2) * ΔP * W^3 / (3 * E)
+
     elseif !isnothing(H) && !isnothing(Q)
         W = sqrt(3 * Q / (2 * π * H))
         ΔP = (π * E * H) / (8 * (1 - ν^2) * W)
@@ -105,9 +113,98 @@ function PennyShapedSill(; W=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e
     RotMat = RotationMatrix(ustrip.(Angle))
     RotMat_negative = RotMat' 
     
-    return PennyShapedSill(Center, Angle, E, ν, ΔP, Q, W, H, RotMat, RotMat_negative)   
+    return PennyShapedSill(
+        convert(GeoUnit, Center),
+        convert(GeoUnit, Angle),
+        convert(GeoUnit, E),
+        convert(GeoUnit, ν),
+        convert(GeoUnit, ΔP),
+        convert(GeoUnit, Q),
+        convert(GeoUnit, W),
+        convert(GeoUnit, H),
+        convert(GeoUnit, RotMat),
+        convert(GeoUnit, RotMat_negative),
+    )
 end
 
+
+"""
+    PennyShapedSill(s::PennyShapedSill; kwargs...)
+
+Create a new penny-shaped sill from an existing one by changing any number of
+parameters.
+
+For updates of `W`, `H`, `ΔP`, or `Q`, a valid constructor combination is
+selected automatically.
+"""
+function PennyShapedSill(s::PennyShapedSill; kwargs...)
+    valid = (:Center, :Angle, :E, :ν, :W, :H, :ΔP, :Q)
+    all(k -> k in valid, keys(kwargs)) ||
+        error("Invalid keyword for PennyShapedSill(s; ...). Valid keys are: $(valid)")
+
+    base = (
+        Center = UnitValue(s.Center),
+        Angle  = UnitValue(s.Angle),
+        E      = UnitValue(s.E),
+        ν      = UnitValue(s.ν),
+        W      = UnitValue(s.W),
+        H      = UnitValue(s.H),
+        ΔP     = UnitValue(s.ΔP),
+        Q      = UnitValue(s.Q),
+    )
+
+    kw = Dict{Symbol,Any}(kwargs)
+    for sym in (:E, :ΔP, :Q, :W, :H)
+        if haskey(kw, sym) && kw[sym] isa Number && !(kw[sym] isa typeof(oneunit(getproperty(base, sym))))
+            kw[sym] = kw[sym] * oneunit(getproperty(base, sym))
+        end
+    end
+
+    updated = merge(base, (; kw...))
+    gkeys = Set{Symbol}(k for k in keys(kwargs) if k in (:W, :H, :ΔP, :Q))
+
+    # Select the correct constructor branch for physically consistent updates.
+    W  = nothing
+    H  = nothing
+    ΔP = nothing
+    Q  = nothing
+
+    if isempty(gkeys)
+        W = updated.W
+        H = updated.H
+    elseif gkeys == Set([:W])
+        W = updated.W
+        H = updated.H
+    elseif gkeys == Set([:H])
+        W = updated.W
+        H = updated.H
+    elseif gkeys == Set([:ΔP])
+        H = updated.H
+        ΔP = updated.ΔP
+    elseif gkeys == Set([:Q])
+        H = updated.H
+        Q = updated.Q
+    elseif gkeys == Set([:W, :H])
+        W = updated.W
+        H = updated.H
+    elseif gkeys == Set([:W, :Q])
+        W = updated.W
+        Q = updated.Q
+    elseif gkeys == Set([:W, :ΔP])
+        W = updated.W
+        ΔP = updated.ΔP
+    elseif gkeys == Set([:H, :Q])
+        H = updated.H
+        Q = updated.Q
+    elseif gkeys == Set([:H, :ΔP])
+        H = updated.H
+        ΔP = updated.ΔP
+    else
+        error("Invalid W/H/ΔP/Q combination. Use one of: W, H, ΔP, Q, W+H, W+Q, W+ΔP, H+Q, H+ΔP")
+    end
+
+    return PennyShapedSill(; Center=updated.Center, Angle=updated.Angle, E=updated.E, ν=updated.ν, W, H, ΔP, Q)
+end
 
 # Print info in the REPL
 function show(io::IO, g::PennyShapedSill)
@@ -129,6 +226,10 @@ function show(io::IO, g::PennyShapedSill)
  
     return nothing
 end
+
+# Volume and area
+volume(s::PennyShapedSill) =  4/3*π*(s.W/2)*(s.W/2)*(s.H/2)     #   (equivalent 3D volume, in m^3)
+area(s::PennyShapedSill) = π*s.W/2*s.H/2                        #   (in 2D, in m^2)  - note that W,H are the diameters
 
 """
     d = hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T})
@@ -272,3 +373,4 @@ function inside(p::Point{3, _T}, sill::PennyShapedSill{3,_T}) where {_T}
 
     return distance <= 1
 end
+

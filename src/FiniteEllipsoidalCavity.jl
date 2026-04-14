@@ -1231,6 +1231,40 @@ function FiniteEllipsoidalCavity(;
     return FiniteEllipsoidalCavity(Center, ax, ay, az, Angle, ΔP, mu, lambda, Nmax, Cr)
 end
 
+"""
+    FiniteEllipsoidalCavity(s::FiniteEllipsoidalCavity; kwargs...)
+
+Create a new `FiniteEllipsoidalCavity` from an existing one by overriding any
+subset of `Center`, `ax`, `ay`, `az`, `Angle`, `ΔP`, `mu`, `lambda`, `Nmax`, `Cr`.
+"""
+function FiniteEllipsoidalCavity(s::FiniteEllipsoidalCavity; kwargs...)
+    valid = (:Center, :ax, :ay, :az, :Angle, :ΔP, :mu, :lambda, :Nmax, :Cr)
+    all(k -> k in valid, keys(kwargs)) ||
+        error("Invalid keyword for FiniteEllipsoidalCavity(s; ...). Valid keys are: $(valid)")
+
+    base = (
+        Center = UnitValue(s.Center),
+        ax     = UnitValue(s.ax),
+        ay     = UnitValue(s.ay),
+        az     = UnitValue(s.az),
+        Angle  = UnitValue(s.Angle),
+        ΔP     = UnitValue(s.ΔP),
+        mu     = UnitValue(s.mu),
+        lambda = UnitValue(s.lambda),
+        Nmax   = s.Nmax,
+        Cr     = s.Cr,
+    )
+
+    kw = Dict{Symbol,Any}(kwargs)
+    for sym in (:ax, :ay, :az, :ΔP, :mu, :lambda)
+        if haskey(kw, sym) && kw[sym] isa Number && !(kw[sym] isa typeof(oneunit(getproperty(base, sym))))
+            kw[sym] = kw[sym] * oneunit(getproperty(base, sym))
+        end
+    end
+
+    return FiniteEllipsoidalCavity(; merge(base, (; kw...))...)
+end
+
 Adapt.@adapt_structure FiniteEllipsoidalCavity
 
 isdimensional(fec::FiniteEllipsoidalCavity) = isdimensional(fec.mu)
@@ -1328,4 +1362,32 @@ function inside(p::Point{3, _T}, fec::FiniteEllipsoidalCavity) where _T
     Δb = R' * Δ
 
     return (Δb[1]/ax)^2 + (Δb[2]/ay)^2 + (Δb[3]/az)^2 <= 1
+end
+
+
+"""
+    update_abstractsill(s::FiniteEllipsoidalCavity; kwargs...) -> FiniteEllipsoidalCavity
+
+Return a new cavity identical to `s` but with the specified parameters updated.
+Accepted keyword arguments: `Center`, `ax`, `ay`, `az`, `Angle`, `ΔP`, `mu`, `lambda`, `Nmax`, `Cr`.
+
+# Example
+```julia
+c2 = update_abstractsill(c, ax = 600.0m, ΔP = 20e6Pa)
+```
+"""
+function update_abstractsill(s::FiniteEllipsoidalCavity; kwargs...)
+    params = (
+        Center = UnitValue(s.Center),
+        ax     = UnitValue(s.ax),
+        ay     = UnitValue(s.ay),
+        az     = UnitValue(s.az),
+        Angle  = UnitValue(s.Angle),
+        ΔP     = UnitValue(s.ΔP),
+        mu     = UnitValue(s.mu),
+        lambda = UnitValue(s.lambda),
+        Nmax   = s.Nmax,
+        Cr     = s.Cr,
+    )
+    return FiniteEllipsoidalCavity(; merge(params, kwargs)...)
 end

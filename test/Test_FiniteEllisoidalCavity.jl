@@ -27,6 +27,15 @@ fec = FiniteEllipsoidalCavity(
 fec_nd = nondimensionalize(fec, CharDim)
 @test isdimensional(fec_nd) == false
 
+# copy-constructor style updates
+fec_u = FiniteEllipsoidalCavity(fec, ax=600.0m, ΔP=20e6Pa, Nmax=4000)
+@test UnitValue(fec_u.ax) ≈ 600.0m
+@test UnitValue(fec_u.ΔP) ≈ 20e6Pa
+@test fec_u.Nmax == 4000
+
+fec_u2 = FiniteEllipsoidalCavity(fec, ay=700.0)
+@test UnitValue(fec_u2.ay) ≈ 700.0m
+
 # ---- array displacement (matches original fECM results) ----------------
 
 ue, un, uv, dV, DV, Ns = hostrock_displacement(fec, X, Y)

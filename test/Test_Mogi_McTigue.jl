@@ -11,6 +11,20 @@ mogi2D = MogiSphere(Center=Point2(0.0,-5000.0)*m, r=1500.0m, ΔP=10e6Pa, G=10e9P
 mogi2D_nd = nondimensionalize(mogi2D, CharDim)
 @test isdimensional(mogi2D_nd) == false
 
+# copy-constructor style updates
+mogi2D_u = MogiSphere(mogi2D, r=1200.0m, ΔP=12e6Pa)
+@test UnitValue(mogi2D_u.r) ≈ 1200.0m
+@test UnitValue(mogi2D_u.ΔP) ≈ 12e6Pa
+
+mogi2D_u2 = MogiSphere(mogi2D, r=1300.0)
+@test UnitValue(mogi2D_u2.r) ≈ 1300.0m
+
+# geometric consistency
+@test InjectSills.area(mogi2D) ≈ π * UnitValue(mogi2D.r)^2
+@test InjectSills.volume(mogi2D) ≈ 4/3 * π * UnitValue(mogi2D.r)^3
+@test InjectSills.area(mogi2D_u2) ≈ π * (1300.0m)^2
+@test InjectSills.volume(mogi2D_u2) ≈ 4/3 * π * (1300.0m)^3
+
 # displacement at x=0 (directly above centre)
 d = hostrock_displacement(mogi2D, Point2(0.0, 0.0))
 @test d[1] ≈ 0.0            # no horizontal displacement on axis
@@ -57,6 +71,19 @@ mctigue2D = McTigueSphere(Center=Point2(0.0,-5000.0)*m, r=1500.0m, ΔP=10e6Pa, G
 
 mctigue2D_nd = nondimensionalize(mctigue2D, CharDim)
 @test isdimensional(mctigue2D_nd) == false
+
+mctigue2D_u = McTigueSphere(mctigue2D, G=12e9Pa, ν=0.27)
+@test UnitValue(mctigue2D_u.G) ≈ 12e9Pa
+@test UnitValue(mctigue2D_u.ν) ≈ 0.27
+
+mctigue2D_u2 = McTigueSphere(mctigue2D, r=1400.0m)
+@test UnitValue(mctigue2D_u2.r) ≈ 1400.0m
+
+# geometric consistency
+@test InjectSills.area(mctigue2D) ≈ π * UnitValue(mctigue2D.r)^2
+@test InjectSills.volume(mctigue2D) ≈ 4/3 * π * UnitValue(mctigue2D.r)^3
+@test InjectSills.area(mctigue2D_u2) ≈ π * (1400.0m)^2
+@test InjectSills.volume(mctigue2D_u2) ≈ 4/3 * π * (1400.0m)^3
 
 # displacement at x=0
 d = hostrock_displacement(mctigue2D, Point2(0.0, 0.0))

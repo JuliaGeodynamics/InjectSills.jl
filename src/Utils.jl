@@ -178,4 +178,5 @@ point_within_box(p::Point{2, _T},W,H) where {_T} = Point2{_T}( 2*(rand()-0.5)*W,
 point_within_box(p::Point{3, _T},W,H) where {_T} = Point3{_T}( 2*(rand()-0.5)*W, 2*(rand()-0.5)*W, (rand()-0.5)*H )
 
 
-
+# Create a named tuple from a struct, which is useful for some of the dispatches in the sill constructor
+to_nt(s) = NamedTuple{fieldnames(typeof(s))}(Tuple(getfield(s, f) for f in fieldnames(typeof(s))))

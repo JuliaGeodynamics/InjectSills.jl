@@ -19,11 +19,46 @@ sill0_nd = nondimensionalize(sill0, CharDim)
 sill = PennyShapedSill(ΔP = 1e6Pa)
 @test UnitValue(sill.W) ≈ UnitValue(sill0.W) 
 
+sill_lowP = PennyShapedSill(ΔP = 1e5Pa)
+@test UnitValue(sill_lowP.W) ≈ UnitValue(sill0.W)
+@test UnitValue(sill_lowP.Q) ≈ 100.0m^3
+
 sill = PennyShapedSill(ΔP = 1e6Pa, Q=1000m^3)
 @test sill.H.val ≈ sill0.H.val 
 
 sill = PennyShapedSill(W = UnitValue(sill0.W), H = UnitValue(sill0.H))
 @test UnitValue(sill.ΔP) ≈ UnitValue(sill0.ΔP) 
+
+# geometric consistency: planform area A = pi*W^2 and volume Q = 2*pi*H*W^2/3
+area0 = π * UnitValue(sill0.W)^2
+@test area0 ≈ π * UnitValue(sill0.W)^2
+@test UnitValue(sill0.Q) ≈ (2 * π * UnitValue(sill0.H) * UnitValue(sill0.W)^2) / 3
+
+# single-parameter update dispatch from existing sill
+sillW = PennyShapedSill(sill0, W = 100.0m)
+@test UnitValue(sillW.W) ≈ 100.0m
+@test UnitValue(sillW.H) ≈ UnitValue(sill0.H)
+
+sillE = PennyShapedSill(sill0, E = 2.0e10Pa)
+@test UnitValue(sillE.E) ≈ 2.0e10Pa
+
+sillWH = PennyShapedSill(sill0, W = 100.0m, H = 50.0m)
+@test UnitValue(sillWH.W) ≈ 100.0m
+@test UnitValue(sillWH.H) ≈ 50.0m
+@test UnitValue(sillWH.Q) ≈ (2 * π * UnitValue(sillWH.H) * UnitValue(sillWH.W)^2) / 3
+
+areaWH = π * UnitValue(sillWH.W)^2
+@test areaWH ≈ π * (100.0m)^2
+
+sillMulti = PennyShapedSill(sill0, W = 120.0m, H = 60.0m, E = 2.2e10Pa)
+@test UnitValue(sillMulti.W) ≈ 120.0m
+@test UnitValue(sillMulti.H) ≈ 60.0m
+@test UnitValue(sillMulti.E) ≈ 2.2e10Pa
+
+sillWΔP = PennyShapedSill(sill0, W = 120.0m, ΔP = 2e6Pa)
+@test UnitValue(sillWΔP.W) ≈ 120.0m
+@test UnitValue(sillWΔP.ΔP) ≈ 2e6Pa
+@test UnitValue(sillWΔP.Q) ≈ 16 * (1 - UnitValue(sill0.ν)^2) * UnitValue(sillWΔP.ΔP) * UnitValue(sillWΔP.W)^3 / (3 * UnitValue(sillWΔP.E))
 
 sill2D = PennyShapedSill()
 @test length(sill2D.Angle.val) == 1

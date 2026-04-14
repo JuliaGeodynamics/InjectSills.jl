@@ -10,6 +10,10 @@ export nondimensionalize, dimensionalize, UnitValue, Value
 abstract type AbstractSill{N,_T} <: AbstractMaterialParam end
 export AbstractSill
 
+volume(s::AbstractSill) =   error("volume not implemented for type $(typeof(s))")    
+area(s::AbstractSill)   =   error("area not implemented for type $(typeof(s))")                   
+export volume, area
+
 include("Utils.jl")
 include("PennyShapedSills.jl")
 include("Mogi_McTigue.jl")
