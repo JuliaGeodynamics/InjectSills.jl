@@ -24,6 +24,10 @@ end
     include("Test_DikePolygons.jl")
 end
 
+@testset "new_point_inside_sill" begin
+    include("Test_NewPointInsideSill.jl")
+end
+
 @testset "Finite Ellipsodial Cavity" begin
     include("Test_FiniteEllisoidalCavity.jl")
 end
