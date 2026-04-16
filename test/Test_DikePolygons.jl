@@ -63,3 +63,23 @@ end
     @test maximum(zr) ≈ -4000.0 atol=1e-6
     @test minimum(zr) ≈ -6000.0 atol=1e-6
 end
+
+@testset "dike_polygon spheres in 2D" begin
+    mogi = MogiSphere(Center=Point2(10.0, -3000.0)*m, r=500.0m)
+    x, z = dike_polygon(mogi, 101)
+    @test length(x) == 101
+    @test length(z) == 101
+    @test maximum(x) ≈ 510.0 atol=1e-8
+    @test minimum(x) ≈ -490.0 atol=1e-8
+    @test maximum(z) ≈ -2500.0 atol=1e-8
+    @test minimum(z) ≈ -3500.0 atol=1e-8
+
+    mct = McTigueSphere(Center=Point2(-20.0, -2000.0)*m, r=400.0m)
+    x2, z2 = dike_polygon(mct, 101)
+    @test length(x2) == 101
+    @test length(z2) == 101
+    @test maximum(x2) ≈ 380.0 atol=1e-8
+    @test minimum(x2) ≈ -420.0 atol=1e-8
+    @test maximum(z2) ≈ -1600.0 atol=1e-8
+    @test minimum(z2) ≈ -2400.0 atol=1e-8
+end

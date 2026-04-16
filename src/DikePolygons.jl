@@ -50,3 +50,21 @@ function dike_polygon(sill::PennyShapedSill{2, _T}, nump::Integer=101) where {_T
     z = [pt[2] for pt in poly]
     return [x, z]
 end
+
+function dike_polygon(sill::MogiSphere{2, _T}, nump::Integer=101) where {_T}
+    GeoParams.@unpack_val r, Center = sill
+    n = max(4, Int(nump))
+    p = range(zero(_T), stop=2 * π, length=n)
+    x = Center[1] .+ r .* cos.(p)
+    z = Center[2] .+ r .* sin.(p)
+    return [collect(x), collect(z)]
+end
+
+function dike_polygon(sill::McTigueSphere{2, _T}, nump::Integer=101) where {_T}
+    GeoParams.@unpack_val r, Center = sill
+    n = max(4, Int(nump))
+    p = range(zero(_T), stop=2 * π, length=n)
+    x = Center[1] .+ r .* cos.(p)
+    z = Center[2] .+ r .* sin.(p)
+    return [collect(x), collect(z)]
+end

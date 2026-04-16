@@ -259,7 +259,7 @@ function hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T}) whe
     Δ0 = p - Center
 
     # rotate point
-    Δ =  rotate_point(Δ0, sill.RotMat.val)    
+    Δ =  InjectSills.rotate_point(Δ0, sill.RotMat.val)    
 
     # sum of squares of distances (done as loop to avoid allocations)
     r = zero(_T)
@@ -276,6 +276,15 @@ function hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T}) whe
     # Compute displacement, using complex functions
     # Remark: this may not work on GPU's, so we would have to mimic this effect somehow 
     Ur, Uz = compute_penny_shaped_displacement_complex(r, z, ΔP, ν, E, W)
+
+    # Numerical regularization close to the sill plane. The complex Sun solution
+    # can occasionally return pathological spikes for points very close to the
+    # intrusion plane inside the sill footprint.
+    #max_disp = 2 * W
+    #if !isfinite(Ur) || !isfinite(Uz) || abs(Ur) > max_disp || abs(Uz) > max_disp
+    #    z_reg = max(z, H / 2)
+    #    Ur, Uz = compute_penny_shaped_displacement_complex(r, z_reg, ΔP, ν, E, W)
+    #end
     #Ur, Uz = compute_penny_shaped_displacement(r, z, ΔP, ν, E, W)
     
     if (Δ[N]<0); Uz = -Uz; end
@@ -293,7 +302,7 @@ function hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T}) whe
 
     # rotate backwards
     #Displacement_r = rotate_point(Displacement, sill.RotMat_negative.val) 
-    Displacement_r = rotate_point(Displacement, sill.RotMat.val') 
+    Displacement_r = InjectSills.rotate_point(Displacement, sill.RotMat.val') 
     
 
     return Displacement_r
