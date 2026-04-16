@@ -1,6 +1,6 @@
 name = "InjectSills"
 uuid = "2361c6a6-84b7-4f91-9ad3-fbd42a4af622"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Boris Kaus <kaus@uni-mainz.de>", "Arne Spang <Arne.Spang@uni-bayreuth.de>", "Albert de Montserrat <albertdemontserratnavarro@erdw.ethz.ch>"]
 
 [deps]
