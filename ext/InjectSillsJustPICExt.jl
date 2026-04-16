@@ -31,11 +31,13 @@ function InjectSills.inject_sill!(
         Dy.data[I] = d[2]
     end
 
+    #=
     # Sub-step if the sill is thicker than one cell
     N   = 1
     fac = 1.0
     if sill.Lengthscale.val > min(dx, dy)
-        N   = ceil(Int, sill.H.val / min(dx, dy)) * 2
+        N   = ceil(Int, sill.Lengthscale.val / min(dx, dy)) * 2
+        @show N
         fac = 1.0 / N
     end
 
@@ -49,7 +51,7 @@ function InjectSills.inject_sill!(
     if force_inject
 
     end
-
+=#
     return nothing
 end
 
@@ -89,7 +91,7 @@ function InjectSills.inject_sill!(
     N   = 1
     fac = 1.0
     if sill.Lengthscale.val > min(dx, dy, dz)
-        N   = ceil(Int, sill.H.val / min(dx, dy, dz)) * 2
+        N   = ceil(Int, sill.Lengthscale.val / min(dx, dy, dz)) * 2
         fac = 1.0 / N
     end
 

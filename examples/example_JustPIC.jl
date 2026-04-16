@@ -30,7 +30,8 @@ function maybe_plot(px, py, Dy, sill2D)
             using GLMakie
         end
 
-        fig, ax, _ = scatter(px[:]/1e3, py[:]/1e3, color=Dy.data[:], markersize=5)
+        ind = findall(.!isnan.(px) .& .!isnan.(py))
+        fig, ax, _ = GLMakie.scatter(px[ind]/1e3, py[ind]/1e3, color=Dy.data[ind], markersize=5)
 
         inside_vec = zeros(Int32, size(px))
         for I in eachindex(px)
@@ -39,10 +40,10 @@ function maybe_plot(px, py, Dy, sill2D)
             end
         end
         ind = findall(inside_vec .== 1)
-        scatter!(ax, px[ind]/1e3, py[ind]/1e3, markersize=15)
+       # GLMakie.scatter!(ax, px[ind]/1e3, py[ind]/1e3, markersize=15)
 
         x_poly, z_poly = dike_polygon(sill2D, 100)
-        lines!(ax, x_poly ./ 1e3, z_poly ./ 1e3, color=:red)
+        GLMakie.lines!(ax, x_poly ./ 1e3, z_poly ./ 1e3, color=:red)
 
         display(fig)
     catch err
@@ -60,8 +61,8 @@ function main()
 
     particles = init_particles(backend, nxcell, max_xcell, min_xcell, xvi...)
 
-    sill2D = PennyShapedSill(Center=Point2(0, -5000)*m, H=40.0m, W=2000.0m, Angle=Vec1(30))
-    sill2D = MogiSphere(Center=Point2(0, -5000)*m, r=1500.0m)
+    #sill2D = PennyShapedSill(Center=Point2(0, -5000)*m, H=40.0m, W=2000.0m, Angle=Vec1(30))
+    sill2D = McTigueSphere(Center=Point2(0, -5000)*m, r=15.0m)
 
     Dx, Dy = init_cell_arrays(particles, Val(2))
     inject_sill!(particles, Dx, Dy, xvi, sill2D)

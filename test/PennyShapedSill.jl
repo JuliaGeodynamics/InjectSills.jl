@@ -172,6 +172,15 @@ d       = hostrock_displacement(sill3D, p)
 @test d[2] ≈ -11.219951034388439
 @test d[3] ≈ 2.2728421032456027e-5
 
+# Case that used to produce a pathological 2D outlier in JustPIC
+sill2D_path = PennyShapedSill(Center=Point2(0,-5000)*m, H=40.0m, W=2000.0m, Angle=Vec1(30))
+p_path = Point2(153.39749773478215, -4999.988823166007)
+d_path = hostrock_displacement(sill2D_path, p_path)
+@test isfinite(d_path[1])
+@test isfinite(d_path[2])
+@test abs(d_path[1]) < 10_000
+@test abs(d_path[2]) < 10_000
+
 
 # test inside routines
 sill2D = PennyShapedSill(Center=Point2(0,-15000)*m, H=100.0m, W=10000.0m, Angle=Vec1(0))
