@@ -28,7 +28,7 @@ GLMakie = "0.13"
 GeoParams = "0.7"
 GeometryBasics = "0.5"
 GeophysicalModelGenerator = "0.7"
-JustPIC = "0.5"
+JustPIC = "0.5, 0.6"
 LinearAlgebra = "1"
 StaticArrays = "1"
 
