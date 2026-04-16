@@ -1,4 +1,4 @@
-using Test
+using Test, InteractiveUtils
 using GeoParams, InjectSills
 
 # ---------------------------------------------------------------------------
@@ -8,9 +8,11 @@ using GeoParams, InjectSills
 # subtype (2D and 3D), call new_point_inside_sill a handful of times, and
 # verify that every returned point is inside the sill via `inside()`.
 #
-# To cover a new subtype in the future, simply add an instance to the
-# appropriate list below.
+# To cover a new subtype in the future, add an instance to the appropriate
+# list below.  The safety-net testset at the bottom will catch any subtype
+# that was added to the package but forgotten here.
 # ---------------------------------------------------------------------------
+
 
 # run N_TRIALS random draws per sill to reduce the chance of a false-positive
 const N_TRIALS = 100
@@ -201,4 +203,15 @@ sills_3d = [
             end
         end
     end
+end
+
+# ---- safety net: fail if a new AbstractSill subtype has no test instance ---
+@testset "coverage – all AbstractSill subtypes are tested" begin
+    registered = Set(nameof(S) for S in subtypes(InjectSills.AbstractSill))
+    tested     = Set(nameof(typeof(s)) for s in Iterators.flatten((sills_2d, sills_3d)))
+    untested   = setdiff(registered, tested)
+    if !isempty(untested)
+        @warn "AbstractSill subtypes with no new_point_inside_sill test instance" untested
+    end
+    @test isempty(untested)
 end

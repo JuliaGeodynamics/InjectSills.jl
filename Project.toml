@@ -22,7 +22,6 @@ InjectSillsGMGExt = "GeophysicalModelGenerator"
 InjectSillsJustPICExt = "JustPIC"
 
 [compat]
-julia = "1.10"
 Adapt = "4"
 GLMakie = "0.13"
 GeoParams = "0.7"
@@ -31,9 +30,11 @@ GeophysicalModelGenerator = "0.7"
 JustPIC = "0.5, 0.6"
 LinearAlgebra = "1"
 StaticArrays = "1"
+julia = "1.10"
 
 [extras]
 GeophysicalModelGenerator = "3700c31b-fa53-48a6-808a-ef22d5a84742"
+InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 
 [targets]
-test = ["GeophysicalModelGenerator"]
+test = ["GeophysicalModelGenerator", "InteractiveUtils"]
