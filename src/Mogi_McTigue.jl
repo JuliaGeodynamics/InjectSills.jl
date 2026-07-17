@@ -247,7 +247,7 @@ function hostrock_displacement(sill::McTigueSphere{N, _T}, p::Point{N, _T}) wher
     R = sqrt(R_sq)
     if R < 1e-8; R = convert(_T, 1e-8); end
 
-    d = abs(Δ[N])
+    d = abs(Center[N])
     if d < 1e-8; d = convert(_T, 1e-8); end
 
     C = r^3 * ΔP * (1 - ν) / (G * R^3)

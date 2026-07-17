@@ -82,12 +82,18 @@ function hostrock_displacement(sill::EllipticalIntrusion{N, _T}, p::Point{N, _T}
         d_r = Vec2{_T}(x * (da / a), z * (da / a))
         return rotate_point(d_r, RotMat')
     else
-        eq = (p_r[1]^2 + p_r[2]^2) / ((W / 2)^2) + (p_r[3]^2) / ((H / 2)^2)
-        if eq == 0
+        x = p_r[1]
+        y = p_r[2]
+        z = p_r[3]
+        a = sqrt(x^2 + y^2 + z^2 / AR^2)
+        if a == 0
             return Vec3{_T}(zero(_T), zero(_T), zero(_T))
         end
-        s = eq^(1 / 6) - 1
-        d_r = Vec3{_T}(p_r[1] * s, p_r[2] * s, p_r[3] * s)
+        a3 = a^3
+        a_inject = W / 2
+        Vol_inject = (4 / 3) * π * a_inject^3 * AR
+        da = ((Vol_inject + (4 / 3) * π * a3 * AR) / ((4 / 3) * π * AR))^(1 / 3) - a
+        d_r = Vec3{_T}(x * (da / a), y * (da / a), z * (da / a))
         return rotate_point(d_r, RotMat')
     end
 end

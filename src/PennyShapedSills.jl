@@ -1,4 +1,4 @@
-# Penny shapes sills embedded in a homogeneous elastic halfspace 
+# Penny shapes sills embedded in a homogeneous elastic halfspace
 using Adapt
 import Base.show
 import GeoParams: isdimensional
@@ -26,35 +26,35 @@ Parameters:
 
 Reference:
 ===
-   Sun, R.J., 1969. Theoretical size of hydraulically induced horizontal fractures and 
-        corresponding surface uplift in an idealized medium. J. Geophys. Res. 74, 5995–6011. 
+   Sun, R.J., 1969. Theoretical size of hydraulically induced horizontal fractures and
+        corresponding surface uplift in an idealized medium. J. Geophys. Res. 74, 5995–6011.
         https://doi.org/10.1029/JB074i025p05995
 
 """
 struct PennyShapedSill{N, _T, N1, N2, U1, U2, U3, U4, U5} <: AbstractSill{N,_T}
     Center::GeoUnit{Point{N, _T},U1}  # m
     Angle::GeoUnit{Vec{N1, _T},U2}    # degrees
-    E::GeoUnit{_T,U3}   # in Pa   
+    E::GeoUnit{_T,U3}   # in Pa
     ν::GeoUnit{_T,U4}   # []
     ΔP::GeoUnit{_T,U3}  # Pa
-    Q::GeoUnit{_T,U5}   # m^3  
-    W::GeoUnit{_T,U1}   # m  
+    Q::GeoUnit{_T,U5}   # m^3
+    W::GeoUnit{_T,U1}   # m
     H::GeoUnit{_T,U1}   # m
     Lengthscale::GeoUnit{_T,U1}
     BoundingBox::Tuple
     RotMat::GeoUnit{SMatrix{N,N,_T,N2},U4}             # rotation matrix (precomputed for efficiency)
-    RotMat_negative::GeoUnit{SMatrix{N,N,_T,N2},U4}    # with negative angle 
+    RotMat_negative::GeoUnit{SMatrix{N,N,_T,N2},U4}    # with negative angle
 end
 Adapt.@adapt_structure PennyShapedSill
 
-isdimensional(PennyShapedSill) = isdimensional(PennyShapedSill.E)
+isdimensional(s::PennyShapedSill) = isdimensional(s.E)
 
 """
     PennyShapedSill(; W=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e10Pa, ν=0.3*NoUnits, Angle=Vec1(0.0)*Pas, Center=Point2(0.0)*m)
 
-Defines parameters for a penny shaped sill in an elastic halfspace.    
+Defines parameters for a penny shaped sill in an elastic halfspace.
 You can give various combinations of parameters to define the sill:
-- `ΔP` and `H` 
+- `ΔP` and `H`
 - `H` and `Q`
 - `W` and `H`
 - `W` and `Q`
@@ -65,7 +65,7 @@ function PennyShapedSill(; W=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e
 
     if isnothing(W) && isnothing(Q) && isnothing(ΔP) && isnothing(H)
         ΔP  =  1e6*Pa
-        Q   =  1000.0*m^3    
+        Q   =  1000.0*m^3
         W   =  (3*E*Q/(16*(1-ν^2)*ΔP))^(1.0/3.0)
         H   =  8*(1-ν^2)*ΔP*W/(π*E)
 
@@ -114,8 +114,8 @@ function PennyShapedSill(; W=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e
 
     # Compute rotation matrix - as this is a relatively expensive operation, we precompute & store it in the struct
     RotMat = RotationMatrix(ustrip.(Angle))
-    RotMat_negative = RotMat' 
-    
+    RotMat_negative = RotMat'
+
     Cg = convert(GeoUnit, Center)
     Wg = convert(GeoUnit, W)
     Hg = convert(GeoUnit, H)
@@ -223,28 +223,28 @@ end
 
 # Print info in the REPL
 function show(io::IO, g::PennyShapedSill)
-    
+
     if isdimensional(g)
         println(io, "Penny-shaped sill in dimensional units:")
-        println(io, "   Center                  : $((g.Center.val...,).*g.Center.unit) ")  
+        println(io, "   Center                  : $((g.Center.val...,).*g.Center.unit) ")
     else
         println(io, "Penny-shaped sill in nondimensional units:")
-        println(io, "   Center                  : $((g.Center.val...,).*g.Center.unit) ")  
-    end 
-    println(io, "   Angle [degree]          : $((g.Angle.val...,)) ")  
-    println(io, "   Young's modulus         : $(UnitValue(g.E)) ")  
-    println(io, "   Poison's ratio          : $(UnitValue(g.ν)) ")  
-    println(io, "   Overpressure            : $(UnitValue(g.ΔP)) ")  
-    println(io, "   Sill volume             : $(UnitValue(g.Q)) ")  
-    println(io, "   Maximum sill thickness  : $(UnitValue(g.H)) ")  
-    println(io, "   Maximum sill width      : $(UnitValue(g.W)) ")  
- 
-    return nothing
-end 
+        println(io, "   Center                  : $((g.Center.val...,).*g.Center.unit) ")
+    end
+    println(io, "   Angle [degree]          : $((g.Angle.val...,)) ")
+    println(io, "   Young's modulus         : $(UnitValue(g.E)) ")
+    println(io, "   Poison's ratio          : $(UnitValue(g.ν)) ")
+    println(io, "   Overpressure            : $(UnitValue(g.ΔP)) ")
+    println(io, "   Sill volume             : $(UnitValue(g.Q)) ")
+    println(io, "   Maximum sill thickness  : $(UnitValue(g.H)) ")
+    println(io, "   Maximum sill width      : $(UnitValue(g.W)) ")
 
-# Volume and area
-volume(s::PennyShapedSill) =  4/3*π*(s.W/2)*(s.W/2)*(s.H/2)     #   (equivalent 3D volume, in m^3)
-area(s::PennyShapedSill) = π*s.W/2*s.H/2                        #   (in 2D, in m^2)  - note that W,H are the diameters
+    return nothing
+end
+
+# Volume and area.
+volume(s::PennyShapedSill) =  4/3*π*UnitValue(s.W)*UnitValue(s.W)*(UnitValue(s.H)/2)   #   (equivalent 3D volume = injected Q, in m^3)
+area(s::PennyShapedSill) = π*UnitValue(s.W)*(UnitValue(s.H)/2)                          #   (vertical cross-section, in m^2)
 
 """
     d = hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T})
@@ -259,7 +259,7 @@ function hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T}) whe
     Δ0 = p - Center
 
     # rotate point
-    Δ =  InjectSills.rotate_point(Δ0, sill.RotMat.val)    
+    Δ =  InjectSills.rotate_point(Δ0, sill.RotMat.val)
 
     # sum of squares of distances (done as loop to avoid allocations)
     r = zero(_T)
@@ -274,7 +274,7 @@ function hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T}) whe
     if z==0; z=1e-8; end
 
     # Compute displacement, using complex functions
-    # Remark: this may not work on GPU's, so we would have to mimic this effect somehow 
+    # Remark: this may not work on GPU's, so we would have to mimic this effect somehow
     Ur, Uz = compute_penny_shaped_displacement_complex(r, z, ΔP, ν, E, W)
 
     # Numerical regularization close to the sill plane. The complex Sun solution
@@ -286,7 +286,7 @@ function hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T}) whe
     #    Ur, Uz = compute_penny_shaped_displacement_complex(r, z_reg, ΔP, ν, E, W)
     #end
     #Ur, Uz = compute_penny_shaped_displacement(r, z, ΔP, ν, E, W)
-    
+
     if (Δ[N]<0); Uz = -Uz; end
     if (Δ[1]<0); Ur = -Ur; end
 
@@ -296,14 +296,14 @@ function hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T}) whe
     elseif N==3
         x = abs(Δ[1])
         y = abs(Δ[2])
-        
+
         Displacement = Vec3{_T}(x/r*Ur,y/r*Ur,Uz)
     end
 
     # rotate backwards
-    #Displacement_r = rotate_point(Displacement, sill.RotMat_negative.val) 
-    Displacement_r = InjectSills.rotate_point(Displacement, sill.RotMat.val') 
-    
+    #Displacement_r = rotate_point(Displacement, sill.RotMat_negative.val)
+    Displacement_r = InjectSills.rotate_point(Displacement, sill.RotMat.val')
+
 
     return Displacement_r
 end
@@ -340,7 +340,7 @@ end
 """
     compute_penny_shaped_displacement_complex(r, z, ΔP, ν, E, W)
 
-Compute the displacement around a penny-shaped sill in a homogeneous elastic halfspace using the original implementation of Sun that uses complex numbers. 
+Compute the displacement around a penny-shaped sill in a homogeneous elastic halfspace using the original implementation of Sun that uses complex numbers.
 """
 function compute_penny_shaped_displacement_complex(r, z, ΔP, ν, E, W)
     imW = im*W
@@ -348,15 +348,15 @@ function compute_penny_shaped_displacement_complex(r, z, ΔP, ν, E, W)
     R2  = sqrt(r^2. + (z + imW)^2);
 
     # equation 7a:
-    dU  = im*ΔP*(1+ν)*(1-2ν)/(2pi*E)*( r*log( (R2+z+imW)/(R1 +z- imW)) 
-            - r/2*((imW-3z-R2)/(R2+z+imW) 
-            + (R1+3z+imW)/(R1+z-imW)) 
-            - (2z^2 * r)/(1 -2ν)*(1/(R2*(R2+z+imW)) -1/(R1*(R1+z-imW))) 
+    dU  = im*ΔP*(1+ν)*(1-2ν)/(2pi*E)*( r*log( (R2+z+imW)/(R1 +z- imW))
+            - r/2*((imW-3z-R2)/(R2+z+imW)
+            + (R1+3z+imW)/(R1+z-imW))
+            - (2z^2 * r)/(1 -2ν)*(1/(R2*(R2+z+imW)) -1/(R1*(R1+z-imW)))
             + (2*z*r)/(1-2ν)*(1/R2 - 1/R1) );
 
     # equation 7b:
-    dW  = 2*im*ΔP*(1-ν^2)/(pi*E)*( z*log( (R2+z+imW)/(R1+z-imW)) 
-            - (R2-R1) 
+    dW  = 2*im*ΔP*(1-ν^2)/(pi*E)*( z*log( (R2+z+imW)/(R1+z-imW))
+            - (R2-R1)
             - 1/(2*(1-ν))*( z*log( (R2+z+imW)/(R1+z-imW)) - imW*z*(1/R2 + 1/R1)) );
 
     Uz =  real(dW);  # vertical displacement should be corrected for z<0
