@@ -20,9 +20,8 @@ ensure_example_env!()
 
 using InjectSills
 using JustPIC
-using JustPIC._2D
 
-const backend = JustPIC.CPUBackend
+const backend = JustPIC.CPU
 
 function maybe_plot(px, py, Dy, sill2D)
     try
@@ -59,7 +58,14 @@ function main()
     yv = range(-Ly, 0, length=n)
     xvi = (xv, yv)
 
-    particles = init_particles(backend, nxcell, max_xcell, min_xcell, xvi...)
+    # Staggered velocity grids: vertex vector on the diagonal, extended cell centers off it.
+    xc = xv[1:end-1] .+ step(xv) / 2
+    yc = yv[1:end-1] .+ step(yv) / 2
+    xce = range(xc[1] - step(xv), xc[end] + step(xv), length=length(xc) + 2)
+    yce = range(yc[1] - step(yv), yc[end] + step(yv), length=length(yc) + 2)
+    grid_vx, grid_vy = (xv, yce), (xce, yv)
+
+    particles = init_particles(backend, nxcell, max_xcell, min_xcell, grid_vx, grid_vy)
 
     sill2D = PennyShapedSill(Center=Point2(0, -5000)*m, H=40.0m, W=2000.0m, Angle=Vec1(30))
     #sill2D = McTigueSphere(Center=Point2(0, -5000)*m, r=15.0m)
