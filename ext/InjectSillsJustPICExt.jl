@@ -1,7 +1,7 @@
 module InjectSillsJustPICExt
 
 using InjectSills
-using JustPIC, JustPIC._2D, JustPIC._3D
+using JustPIC
 
 """
     inject_sill!(particles, Dx, Dy, xvi, sill::AbstractSill{2,_T}; force_inject=false)
@@ -99,7 +99,7 @@ function InjectSills.inject_sill!(
         particles.coords[1].data .+= Dx.data .* fac
         particles.coords[2].data .+= Dy.data .* fac
         particles.coords[3].data .+= Dz.data .* fac
-        JustPIC._3D.move_particles!(particles, xvi, (Dx, Dy, Dz))
+        JustPIC.move_particles!(particles, (Dx, Dy, Dz))
     end
 
 

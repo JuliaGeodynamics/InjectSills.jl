@@ -44,3 +44,7 @@ try
 catch e
     @info "Skipping GMG extension tests" exception=e
 end
+
+@testset "JustPIC extension" begin
+    include("Test_JustPIC.jl")
+end
