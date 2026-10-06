@@ -1,4 +1,5 @@
 [![CI](https://github.com/JuliaGeodynamics/InjectSills.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/JuliaGeodynamics/InjectSills.jl/actions/workflows/CI.yml)
+[![codecov](https://codecov.io/gh/JuliaGeodynamics/InjectSills.jl/graph/badge.svg)](https://codecov.io/gh/JuliaGeodynamics/InjectSills.jl)
 
 # InjectSills.jl
 
