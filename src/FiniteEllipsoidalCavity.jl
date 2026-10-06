@@ -1191,6 +1191,9 @@ end
 function FiniteEllipsoidalCavity(
     Center, ax, ay, az, Angle, ΔP, mu, lambda, Nmax=5000, Cr=14
 )
+    check_positive(FiniteEllipsoidalCavity, :ax, ax)
+    check_positive(FiniteEllipsoidalCavity, :ay, ay)
+    check_positive(FiniteEllipsoidalCavity, :az, az)
     Cg  = convert(GeoUnit, Center)
     axg = convert(GeoUnit, ax)
     ayg = convert(GeoUnit, ay)
@@ -1216,7 +1219,7 @@ end
     FiniteEllipsoidalCavity(; Center, ax, ay, az, Angle, ΔP, mu, lambda, Nmax=5000, Cr=14)
 
 Keyword constructor. `Center` uses signed z (negative = depth), e.g.
-`Center = Point3(0.0, 0.0, -10250.0)*m`.
+`Center = Point3(0.0, 0.0, -10250.0)*m`. The semi-axes `ax`, `ay`, `az` must be positive.
 """
 function FiniteEllipsoidalCavity(;
     Center = Point3(0.0, 0.0, -10250.0) * m,
@@ -1402,5 +1405,6 @@ function update_abstractsill(s::FiniteEllipsoidalCavity; kwargs...)
         Nmax   = s.Nmax,
         Cr     = s.Cr,
     )
+    check_keywords(FiniteEllipsoidalCavity, kwargs, keys(params))
     return FiniteEllipsoidalCavity(; merge(params, kwargs)...)
 end

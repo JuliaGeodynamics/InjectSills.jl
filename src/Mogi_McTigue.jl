@@ -42,6 +42,7 @@ isdimensional(s::MogiSphere) = isdimensional(s.G)
     MogiSphere(; Center=Point2(0.0,-5000.0)*m, r=1500.0m, ΔP=10e6Pa, G=10e9Pa, ν=0.25*NoUnits)
 
 Construct a Mogi spherical pressure source with keyword arguments.
+`r` must be positive and `ν` must satisfy `-1 < ν ≤ 0.5`.
 """
 function MogiSphere(;
     Center = Point2(0.0, -5000.0) * m,
@@ -50,6 +51,8 @@ function MogiSphere(;
     G      = 10e9Pa,
     ν      = 0.25 * NoUnits,
 )
+    check_positive(MogiSphere, :r, r)
+    check_poisson_ratio(MogiSphere, ν; incompressible=true)
     Cg = convert(GeoUnit, Center)
     rg = convert(GeoUnit, r)
     Lengthscale = rg
@@ -136,6 +139,8 @@ isdimensional(s::McTigueSphere) = isdimensional(s.G)
 
 """
     McTigueSphere(; Center=Point2(0.0,-5000.0)*m, r=1500.0m, ΔP=10e6Pa, G=10e9Pa, ν=0.25*NoUnits)
+
+`r` must be positive and `ν` must satisfy `-1 < ν ≤ 0.5`.
 """
 function McTigueSphere(;
     Center = Point2(0.0, -5000.0) * m,
@@ -144,6 +149,8 @@ function McTigueSphere(;
     G      = 10e9Pa,
     ν      = 0.25 * NoUnits,
 )
+    check_positive(McTigueSphere, :r, r)
+    check_poisson_ratio(McTigueSphere, ν; incompressible=true)
     Cg = convert(GeoUnit, Center)
     rg = convert(GeoUnit, r)
     Lengthscale = rg
@@ -319,6 +326,7 @@ function update_abstractsill(s::MogiSphere; kwargs...)
         G      = UnitValue(s.G),
         ν      = UnitValue(s.ν),
     )
+    check_keywords(MogiSphere, kwargs, keys(params))
     return MogiSphere(; merge(params, kwargs)...)
 end
 
@@ -330,5 +338,6 @@ function update_abstractsill(s::McTigueSphere; kwargs...)
         G      = UnitValue(s.G),
         ν      = UnitValue(s.ν),
     )
+    check_keywords(McTigueSphere, kwargs, keys(params))
     return McTigueSphere(; merge(params, kwargs)...)
 end

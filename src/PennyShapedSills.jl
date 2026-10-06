@@ -53,15 +53,25 @@ isdimensional(s::PennyShapedSill) = isdimensional(s.E)
     PennyShapedSill(; W=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e10Pa, ν=0.3*NoUnits, Angle=Vec1(0.0)*Pas, Center=Point2(0.0)*m)
 
 Defines parameters for a penny shaped sill in an elastic halfspace.
-You can give various combinations of parameters to define the sill:
-- `ΔP` and `H`
-- `H` and `Q`
-- `W` and `H`
-- `W` and `Q`
-- `W` and `ΔP`
+The geometry is set by at most two of `W`, `H`, `ΔP`, `Q`:
+- any two of them (`W`+`H`, `W`+`Q`, `W`+`ΔP`, `H`+`Q`, `H`+`ΔP`, `Q`+`ΔP`)
+- only `Q` (with `ΔP = 1e6Pa`) or only `ΔP` (with the `W` of the default sill)
+- none of them (defaults `ΔP = 1e6Pa`, `Q = 1000m^3`)
+
+Giving three or four of them, or only `W` or only `H`, throws an `ArgumentError`.
+`W`, `H`, `ΔP` and `Q` must be positive, and `ν` must satisfy `-1 < ν < 0.5`
+(the solution of Sun (1969) contains `1/(1-2ν)`).
 """
 function PennyShapedSill(; W=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e10Pa, ν=0.3*NoUnits, Angle=Vec1(0.0)*Pas, Center=Point2(0.0)*m)
     @assert length(Center)==length(Angle)+1
+    check_poisson_ratio(PennyShapedSill, ν; incompressible=false)
+    given = [name for (name, x) in ((:W, W), (:H, H), (:ΔP, ΔP), (:Q, Q)) if !isnothing(x)]
+    if length(given) > 2 || given == [:W] || given == [:H]
+        throw(ArgumentError("PennyShapedSill: got $(join(given, ", ")); specify at most two of W, H, ΔP, Q (any pair), only Q, only ΔP, or none of them"))
+    end
+    for (name, x) in ((:W, W), (:H, H), (:ΔP, ΔP), (:Q, Q))
+        isnothing(x) || check_positive(PennyShapedSill, name, x)
+    end
 
     if isnothing(W) && isnothing(Q) && isnothing(ΔP) && isnothing(H)
         ΔP  =  1e6*Pa
@@ -106,10 +116,6 @@ function PennyShapedSill(; W=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e
     elseif !isnothing(H) && !isnothing(ΔP)
         W = (π * E * H) / (8 * (1 - ν^2) * ΔP)
         Q = (π^3 * E^2 * H^3) / (96 * (1 - ν^2)^2 * ΔP^2)
-    end
-
-    if isnothing(W) || isnothing(Q) || isnothing(ΔP) || isnothing(H)
-        error("you need to specify W and Q or ΔP and H or combinations")
     end
 
     # Compute rotation matrix - as this is a relatively expensive operation, we precompute & store it in the struct
@@ -418,6 +424,7 @@ p4 = update_abstractsill(p, ΔP = 2e6Pa)
 ```
 """
 function update_abstractsill(s::PennyShapedSill; kwargs...)
+    check_keywords(PennyShapedSill, kwargs, (:Center, :Angle, :E, :ν, :W, :H, :ΔP, :Q))
     kw = Dict{Symbol,Any}(kwargs)
 
     has_W  = haskey(kw, :W)

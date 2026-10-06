@@ -1,4 +1,5 @@
 using InjectSills, Test
+using GeophysicalModelGenerator
 
 @testset "Penny shaped sill" begin
     include("PennyShapedSill.jl")
@@ -36,13 +37,12 @@ end
     include("Test_Mogi_McTigue.jl")
 end
 
-try
-    using GeophysicalModelGenerator
-    @testset "GeophysicalModelGenerator extension" begin
-        include("Test_GMG.jl")
-    end
-catch e
-    @info "Skipping GMG extension tests" exception=e
+@testset "Input validation" begin
+    include("Test_InputValidation.jl")
+end
+
+@testset "GeophysicalModelGenerator extension" begin
+    include("Test_GMG.jl")
 end
 
 @testset "JustPIC extension" begin

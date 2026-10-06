@@ -131,3 +131,30 @@ end
 
 # Create a named tuple from a struct, which is useful for some of the dispatches in the sill constructor
 to_nt(s) = NamedTuple{fieldnames(typeof(s))}(Tuple(getfield(s, f) for f in fieldnames(typeof(s))))
+
+
+# Argument validation shared by the sill constructors and `update_abstractsill`.
+# Values may be plain numbers, Unitful quantities, or `GeoUnit`s.
+plain_value(x) = x isa GeoUnit ? UnitValue(x) : x
+
+function check_positive(T, name, x)
+    v = plain_value(x)
+    ustrip(v) > 0 || throw(ArgumentError("$T: `$name` must be positive; got $name = $v"))
+    return nothing
+end
+
+# Isotropic linear elasticity requires -1 < ν ≤ 1/2. Solutions containing
+# 1/(1-2ν) are singular at ν = 1/2, so those callers pass `incompressible=false`.
+function check_poisson_ratio(T, ν; incompressible::Bool)
+    v = ustrip(plain_value(ν))
+    valid = incompressible ? -1 < v <= 0.5 : -1 < v < 0.5
+    valid || throw(ArgumentError("$T: Poisson's ratio must satisfy -1 < ν $(incompressible ? "≤" : "<") 0.5; got ν = $v"))
+    return nothing
+end
+
+function check_keywords(T, kwargs, valid)
+    for k in keys(kwargs)
+        k in valid || throw(ArgumentError("$T: unknown keyword `$k`; valid keywords are $(join(valid, ", "))"))
+    end
+    return nothing
+end

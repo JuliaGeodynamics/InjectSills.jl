@@ -26,6 +26,10 @@ src = MogiSphere(
 
 Ux, Uy, Uz = surface_displacement(src, surf)
 
+src_km = MogiSphere(Center=Point3(0.0, 0.0, -5.0)*km, r=1.5km, ΔP=10e6Pa, G=10e9Pa, ν=0.25*NoUnits)
+@test_throws "the sill must have lengths in m" surface_displacement(src_km, surf)
+@test_throws "a nondimensionalized sill" surface_displacement(nondimensionalize(src, GEO_units()), surf)
+
 @test size(Ux) == (nx, ny, nz)
 @test size(Uy) == (nx, ny, nz)
 @test size(Uz) == (nx, ny, nz)

@@ -8,13 +8,14 @@ using GeophysicalModelGenerator
     cart_out   = surface_displacement(sill::AbstractSill{3}, cart::CartData; add_fields=true)
 
 Compute the surface displacement induced by `sill` at every point of the `CartData` surface
-`cart`. The sill must be in dimensional (SI) units. `CartData` coordinates are in km and are
-converted to metres internally before calling `hostrock_displacement`.
+`cart`. The sill must be dimensional with lengths in m; otherwise an `ArgumentError` is thrown.
+`CartData` coordinates are in km and are converted to meters internally before calling
+`hostrock_displacement`.
 
-Returns `(Ux, Uy, Uz)` as arrays in metres by default.
+Returns `(Ux, Uy, Uz)` as arrays in meters by default.
 
 If `add_fields = true`, the displacement arrays are added to the `CartData` as named fields
-`(:Ux, :Uy, :Uz)` in metres and the updated `CartData` is returned.
+`(:Ux, :Uy, :Uz)` in meters and the updated `CartData` is returned.
 
 # Example
 ```julia
@@ -44,6 +45,12 @@ function InjectSills.surface_displacement(
     cart::CartData;
     add_fields::Bool = false,
 ) where {_T}
+    # All length fields of a sill share the unit of `Center`.
+    if !(InjectSills.isdimensional(sill.Center) && sill.Center.unit == m)
+        got = InjectSills.isdimensional(sill.Center) ? "lengths in $(sill.Center.unit)" : "a nondimensionalized sill"
+        throw(ArgumentError("surface_displacement: the sill must have lengths in m (CartData coordinates in km are converted to m); got $got"))
+    end
+
     x_km = cart.x.val   # arrays in km
     y_km = cart.y.val
     z_km = cart.z.val

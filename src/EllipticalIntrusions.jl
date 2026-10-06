@@ -24,6 +24,8 @@ function EllipticalIntrusion(;
     H      = 100.0m,
 )
     @assert length(Center) == length(Angle) + 1
+    check_positive(EllipticalIntrusion, :W, W)
+    check_positive(EllipticalIntrusion, :H, H)
     RotMat = RotationMatrix(ustrip.(Angle))
     Cg = convert(GeoUnit, Center)
     Wg = convert(GeoUnit, W)
@@ -120,5 +122,6 @@ end
 
 function update_abstractsill(s::EllipticalIntrusion; kwargs...)
     params = (Center=UnitValue(s.Center), Angle=UnitValue(s.Angle), W=UnitValue(s.W), H=UnitValue(s.H))
+    check_keywords(EllipticalIntrusion, kwargs, keys(params))
     return EllipticalIntrusion(; merge(params, kwargs)...)
 end

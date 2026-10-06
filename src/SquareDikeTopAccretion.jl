@@ -25,6 +25,8 @@ isdimensional(s::SquareDikeTopAccretion) = isdimensional(s.W)
 
 """
     SquareDikeTopAccretion(; Center=Point2(0.0, -5000.0)*m, Angle=Vec1(0.0)*NoUnits, W=2000.0m, H=100.0m)
+
+`W` and `H` must be positive.
 """
 function SquareDikeTopAccretion(;
     Center = Point2(0.0, -5000.0) * m,
@@ -33,6 +35,8 @@ function SquareDikeTopAccretion(;
     H      = 100.0m,
 )
     @assert length(Center) == length(Angle) + 1
+    check_positive(SquareDikeTopAccretion, :W, W)
+    check_positive(SquareDikeTopAccretion, :H, H)
     RotMat = RotationMatrix(ustrip.(Angle))
     Cg = convert(GeoUnit, Center)
     Wg = convert(GeoUnit, W)
@@ -136,5 +140,6 @@ function update_abstractsill(s::SquareDikeTopAccretion; kwargs...)
         W      = UnitValue(s.W),
         H      = UnitValue(s.H),
     )
+    check_keywords(SquareDikeTopAccretion, kwargs, keys(params))
     return SquareDikeTopAccretion(; merge(params, kwargs)...)
 end
