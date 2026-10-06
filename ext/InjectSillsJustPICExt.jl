@@ -12,7 +12,8 @@ Displace JustPIC `particles` by the host-rock displacement of `sill` and move th
 their new cells. `Dx`, `Dy` (, `Dz`) are `CellArray`s from `init_cell_arrays`; they
 return the displacement of each particle. `fields` are further particle `CellArray`s
 (e.g. phase, temperature) that move with the particles. `xvi` is not used; the grid
-is taken from `particles`.
+is taken from `particles`. The displacements are evaluated on all `Threads.nthreads()`
+threads.
 
 With `force_inject=true`, the sill is then filled with new particles at the initial
 density `particles.nxcell` per cell, and each of `fields` is set to the matching entry
@@ -27,7 +28,7 @@ InjectSills.inject_sill!(particles, Dx, Dy, Dz, xvi, sill::AbstractSill{3}; kwar
 function _inject_sill!(particles, D::NTuple{N}, xvi, sill::AbstractSill{N, _T};
                        fields=(), values=(), force_inject=false) where {N, _T}
     coords = map(c -> c.data, particles.coords)
-    for I in eachindex(coords[1])
+    Threads.@threads for I in eachindex(coords[1])
         p = Point{N, _T}(ntuple(k -> coords[k][I], Val(N)))
         d = isnan(p) ? zero(Vec{N, _T}) : hostrock_displacement(sill, p)
         for k in 1:N

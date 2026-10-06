@@ -344,18 +344,19 @@ function compute_penny_shaped_displacement_complex(r, z, ΔP, ν, E, W)
     imW = im*W
     R1  = sqrt(r^2. + (z - imW)^2);
     R2  = sqrt(r^2. + (z + imW)^2);
+    L   = log((R2+z+imW)/(R1+z-imW))
 
     # equation 7a:
-    dU  = im*ΔP*(1+ν)*(1-2ν)/(2pi*E)*( r*log( (R2+z+imW)/(R1 +z- imW))
+    dU  = im*ΔP*(1+ν)*(1-2ν)/(2pi*E)*( r*L
             - r/2*((imW-3z-R2)/(R2+z+imW)
             + (R1+3z+imW)/(R1+z-imW))
             - (2z^2 * r)/(1 -2ν)*(1/(R2*(R2+z+imW)) -1/(R1*(R1+z-imW)))
             + (2*z*r)/(1-2ν)*(1/R2 - 1/R1) );
 
     # equation 7b:
-    dW  = 2*im*ΔP*(1-ν^2)/(pi*E)*( z*log( (R2+z+imW)/(R1+z-imW))
+    dW  = 2*im*ΔP*(1-ν^2)/(pi*E)*( z*L
             - (R2-R1)
-            - 1/(2*(1-ν))*( z*log( (R2+z+imW)/(R1+z-imW)) - imW*z*(1/R2 + 1/R1)) );
+            - 1/(2*(1-ν))*( z*L - imW*z*(1/R2 + 1/R1)) );
 
     Uz =  real(dW);  # vertical displacement should be corrected for z<0
     Ur =  real(dU);
