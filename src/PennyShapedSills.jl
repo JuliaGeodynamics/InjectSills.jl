@@ -288,17 +288,9 @@ function hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T}) whe
     #Ur, Uz = compute_penny_shaped_displacement(r, z, ΔP, ν, E, W)
 
     if (Δ[N]<0); Uz = -Uz; end
-    if (Δ[1]<0); Ur = -Ur; end
 
-    Displacement  = Vec{N, _T}(Uz)
-    if N==2
-        Displacement = Vec2{_T}(Ur,Uz)
-    elseif N==3
-        x = abs(Δ[1])
-        y = abs(Δ[2])
-
-        Displacement = Vec3{_T}(x/r*Ur,y/r*Ur,Uz)
-    end
+    # Ur is the axisymmetric radial (outward) displacement; project onto the in-plane axes
+    Displacement = N == 2 ? Vec2{_T}(Δ[1]/r*Ur, Uz) : Vec3{_T}(Δ[1]/r*Ur, Δ[2]/r*Ur, Uz)
 
     # rotate backwards
     #Displacement_r = rotate_point(Displacement, sill.RotMat_negative.val)

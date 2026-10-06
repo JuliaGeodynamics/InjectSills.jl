@@ -43,6 +43,10 @@ d3 = hostrock_displacement(c3, Point3(200.0, 200.0, -5010.0))
 @test d3[2] ≈ 0.0
 @test d3[3] ≈ -100.0
 
+# circular footprint, as used by the displacement
+@test inside(Point3(600.0, 600.0, -5000.0), c3) == true
+@test inside(Point3(900.0, 900.0, -5000.0), c3) == false
+@test inside(Point3(900.0, 900.0, -5000.0), CylindricalDikeTopAccretionFullModelAdvection(Center=Point3(0.0, 0.0, -5000.0)*m, Angle=Vec2(0.0, 0.0)*NoUnits, W=2000.0m, H=100.0m)) == false
 d3o = hostrock_displacement(c3, Point3(1200.0, 1200.0, -5010.0))
 @test d3o[3] ≈ 0.0
 

@@ -168,7 +168,7 @@ function inside(p::Point{3, _T}, sill::CylindricalDikeTopAccretion{3, _T}; rotat
     if rotate
         p_r = rotate_point(p_r, RotMat)
     end
-    return abs(p_r[1]) <= W / 2 && abs(p_r[2]) <= W / 2 && abs(p_r[3]) <= H / 2
+    return p_r[1]^2 + p_r[2]^2 <= (W / 2)^2 && abs(p_r[3]) <= H / 2
 end
 
 function inside(p::Point{2, _T}, sill::CylindricalDikeTopAccretionFullModelAdvection{2, _T}; rotate::Bool=true) where {_T}
@@ -185,7 +185,7 @@ function inside(p::Point{3, _T}, sill::CylindricalDikeTopAccretionFullModelAdvec
     if rotate
         p_r = rotate_point(p_r, RotMat)
     end
-    return abs(p_r[1]) <= W / 2 && abs(p_r[2]) <= W / 2 && abs(p_r[3]) <= H / 2
+    return p_r[1]^2 + p_r[2]^2 <= (W / 2)^2 && abs(p_r[3]) <= H / 2
 end
 
 function update_abstractsill(s::CylindricalDikeTopAccretion; kwargs...)

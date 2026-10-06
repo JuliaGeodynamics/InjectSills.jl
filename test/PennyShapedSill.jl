@@ -121,14 +121,14 @@ for I in CartesianIndices(Ux)
     Ux[I],Uy[I],Uz[I]  = hostrock_displacement(sill3D, Point3(x[I[1]],y[I[2]],z[I[3]]))
 end
 @test all(extrema(Ux) .≈ (-8.414980322087171, 8.414980322087171))
-@test all(extrema(Uy) .≈ (-11.219951034388439, 10.885274888931045))
+@test all(extrema(Uy) .≈ (-11.219951034388439, 11.219951034388439))
 @test all(extrema(Uz) .≈ (-49.09081409472374, 49.99999999998878))
 
 # Perform computations for a few selected points, which we set in MTK by hand
 p = Point2(0,12.0)
 sill2D = PennyShapedSill(Center=Point2(0,-15000)*m, H=100.0m, W=10000.0m, Angle=Vec1(0))
 d = hostrock_displacement(sill2D, p)
-@test d[1] ≈ 4.162983686155986e-12 # compared with MTK
+@test d[1] == 0.0                  # on the axis; MTK returns ~4e-12 from its r regularization
 @test d[2] ≈ 12.660339641108203
 
 p = Point2(0,12.0)
@@ -169,8 +169,16 @@ sill3D  = PennyShapedSill(Center=Point3(0.0,0,-25000)*m, H=100.0m, W=20000.0m, A
 p       = Point3(0,-20e3,-25e3)
 d       = hostrock_displacement(sill3D, p)
 @test d[1] ≈ 0.0
-@test d[2] ≈ -11.219951034388439
+@test d[2] ≈ 11.219951034388439
 @test d[3] ≈ 2.2728421032456027e-5
+
+# Axisymmetry in the sill frame: rotating a point 90° about the sill normal rotates its displacement
+sill_rot = PennyShapedSill(Center=Point3(0.0,0,-5000)*m, H=10.0m, W=1000.0m, Angle=Vec2(30.0,20.0))
+R  = sill_rot.RotMat.val
+to_world(q) = Point3(0.0,0,-5000) + R' * q
+u1 = R * hostrock_displacement(sill_rot, to_world(Point3(300.0, 400.0, 100.0)))
+u2 = R * hostrock_displacement(sill_rot, to_world(Point3(-400.0, 300.0, 100.0)))
+@test u2 ≈ [-u1[2], u1[1], u1[3]]
 
 # Case that used to produce a pathological 2D outlier in JustPIC
 sill2D_path = PennyShapedSill(Center=Point2(0,-5000)*m, H=40.0m, W=2000.0m, Angle=Vec1(30))

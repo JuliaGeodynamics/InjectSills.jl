@@ -83,78 +83,24 @@ end
     pt = new_point_inside_sill(sill::AbstractSill{N,_T})
 
 Generates a single new point that is within the sill.
-Samples uniformly from the (non-rotated) bounding box and accepts the first
-point that passes the `inside` test.  Works for all `AbstractSill` subtypes
-because it only relies on `BoundingBox` and `inside`, which every subtype provides.
+Samples uniformly from the unrotated bounding box in the sill frame, accepts the
+first point that passes `inside(...; rotate=false)`, and maps it to world
+coordinates with `local_to_world`. Throws if no point is accepted after 1000 tries.
 """
 function new_point_inside_sill(sill::AbstractSill{N,_T}) where {_T,N}
-    lower    = sill.BoundingBox[1].val
-    upper    = sill.BoundingBox[2].val
-    isinside = false
-    count    = 0
-    coord    = lower
-
-    while !isinside && count < 1000
-        count   += 1
-        coord    = random_point_in_bbox(lower, upper)
-        isinside = inside(coord, sill)
-    end
-
-    return coord
-end
-
-"""
-    pts = new_point_inside_sill(sill::AbstractSill{N,_T}, xvi, nx, ny; parts_per_cell = 10)
-
-Generates a 3D Array with `parts_per_cell` particles per grid cell for all cells
-that overlap the sill bounding box.
-"""
-function new_point_inside_sill(sill::AbstractSill{N,_T}, xvi, nx, ny; parts_per_cell = 10) where {_T,N}
     lower = sill.BoundingBox[1].val
     upper = sill.BoundingBox[2].val
-
-    # this layout kind-of mimics the layout of a CellArray
-    parts2inject = fill(_nan_point(lower), nx, ny, parts_per_cell)
-
-    # iterate over cells
-    for j in axes(parts2inject, 2), i in axes(parts2inject, 1)
-
-        iscell_inside = rectangles_intercept(
-            (xvi[1][i], xvi[2][j], xvi[1][i+1], xvi[2][j+1]),   # x1_min, y1_min, x1_max, y1_max
-            (lower[1], lower[2], upper[1], upper[2])              # x2_min, y2_min, x2_max, y2_max
-        )
-
-        iscell_inside || continue
-
-        # iterate over particles in the cell
-        for k in axes(parts2inject, 3)
-            isinside = false
-            while !isinside
-                coord    = random_point_in_bbox(lower, upper)
-                isinside = inside(coord, sill)
-                if isinside
-                    parts2inject[i, j, k] = coord
-                end
-            end
-        end
+    for _ in 1:1000
+        q = random_point_in_bbox(lower, upper)
+        inside(q, sill; rotate=false) && return local_to_world(sill, q)
     end
-
-    return parts2inject
+    error("new_point_inside_sill: no point inside $(nameof(typeof(sill))) after 1000 tries")
 end
 
-function rectangles_intercept(rect1, rect2)
-    # Unpack the rectangles
-    x1_min, y1_min, x1_max, y1_max = rect1
-    x2_min, y2_min, x2_max, y2_max = rect2
-
-    # Check if there is no overlap
-    if x1_max < x2_min || x2_max < x1_min || y1_max < y2_min || y2_max < y1_min
-        return false
-    end
-
-    # Otherwise, they intersect
-    return true
-end
+# Maps a point of the unrotated, centered sill to world coordinates; sources without
+# `RotMat` (spheres) are rotation invariant.
+local_to_world(sill::AbstractSill, q) =
+    hasproperty(sill, :RotMat) ? sill.Center.val + rotate_point(q - sill.Center.val, sill.RotMat.val') : q
 
 # Sample a uniformly random point inside an axis-aligned bounding box.
 random_point_in_bbox(lower::Point{2,_T}, upper::Point{2,_T}) where {_T} =
@@ -165,10 +111,6 @@ random_point_in_bbox(lower::Point{3,_T}, upper::Point{3,_T}) where {_T} =
     Point3{_T}(lower[1] + rand(_T) * (upper[1] - lower[1]),
                lower[2] + rand(_T) * (upper[2] - lower[2]),
                lower[3] + rand(_T) * (upper[3] - lower[3]))
-
-# NaN-filled sentinel point with the correct dimensionality and numeric type.
-_nan_point(::Point{2,_T}) where {_T} = Point2{_T}(_T(NaN), _T(NaN))
-_nan_point(::Point{3,_T}) where {_T} = Point3{_T}(_T(NaN), _T(NaN), _T(NaN))
 
 
 # Build an axis-aligned (unrotated) bounding box around a center point.

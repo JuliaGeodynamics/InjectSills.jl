@@ -1010,16 +1010,8 @@ function Ell_Plane_Intersect(ax, ay, az, a, b, c, d)
     # Build Pc matrix - each row is a center point
     Pc = hcat(Ck .* ax^2 * a, Ck .* ay^2 * b, Ck .* az^2 * c)
     
-    # If multiple planes, replicate the basis vectors
-    # eMaj and eMin are the same for all planes (only scaling changes)
-    if length(d) > 1
-        # Create matrices where each row is the same basis vector
-        eMaj_mat = repeat(eMaj', length(d), 1)
-        eMin_mat = repeat(eMin', length(d), 1)
-        return Pc, aMaj, aMin, eMaj_mat, eMin_mat
-    else
-        return Pc, aMaj, aMin, eMaj, eMin
-    end
+    # One row per plane: the basis vectors are shared, only the scaling changes
+    return Pc, aMaj, aMin, repeat(eMaj', length(d), 1), repeat(eMin', length(d), 1)
 end
 
 
@@ -1338,14 +1330,33 @@ end
 """
     d = hostrock_displacement(fec::FiniteEllipsoidalCavity, p::Point{3,_T})
 
-Surface displacement at a single observation point `p`.
-Only the horizontal coordinates `p[1]`, `p[2]` are used (surface model).
-Returns a `Vec3` (East, North, vertical).
+Surface displacement at a single observation point `p` on the free surface `z = 0`.
+Returns a `Vec3` (East, North, vertical). The solution is only defined at the
+surface, so a point with `p[3] != 0` throws an `ArgumentError`.
 """
 function hostrock_displacement(fec::FiniteEllipsoidalCavity, p::Point{3, _T}) where _T
+    iszero(p[3]) || throw(ArgumentError("FiniteEllipsoidalCavity gives surface displacement only; got z = $(p[3]), expected 0"))
     ue, un, uv, _, _, _ = hostrock_displacement(fec, [p[1]], [p[2]])
     return Vec3{_T}(ue[1], un[1], uv[1])
 end
+
+
+# Body-to-EFCS rotation of the cavity axes for angles (omegaX, omegaY, omegaZ) in degrees.
+function fec_rotation(Angle)
+    omegaX, omegaY, omegaZ = Angle[1], Angle[2], Angle[3]
+    Rx = @SMatrix [1  0              0;
+                   0  cosd(omegaX)   sind(omegaX);
+                   0 -sind(omegaX)   cosd(omegaX)]
+    Ry = @SMatrix [cosd(omegaY)  0  -sind(omegaY);
+                   0             1   0;
+                   sind(omegaY)  0   cosd(omegaY)]
+    Rz = @SMatrix [cosd(omegaZ)   sind(omegaZ)  0;
+                  -sind(omegaZ)   cosd(omegaZ)  0;
+                   0              0             1]
+    return Rz * Ry * Rx
+end
+
+local_to_world(fec::FiniteEllipsoidalCavity, q) = Point3(fec.Center.val + fec_rotation(fec.Angle.val) * (q - fec.Center.val))
 
 
 # ---- inside --------------------------------------------------------------
@@ -1357,19 +1368,7 @@ Returns `true` if `p` is inside the (possibly rotated) ellipsoidal cavity.
 """
 function inside(p::Point{3, _T}, fec::FiniteEllipsoidalCavity; rotate::Bool=true) where _T
     GeoParams.@unpack_val Center, ax, ay, az, Angle = fec
-
-    omegaX, omegaY, omegaZ = Angle[1], Angle[2], Angle[3]
-
-    Rx = [1  0              0;
-          0  cosd(omegaX)   sind(omegaX);
-          0 -sind(omegaX)   cosd(omegaX)]
-    Ry = [cosd(omegaY)  0  -sind(omegaY);
-          0             1   0;
-          sind(omegaY)  0   cosd(omegaY)]
-    Rz = [cosd(omegaZ)   sind(omegaZ)  0;
-         -sind(omegaZ)   cosd(omegaZ)  0;
-          0              0             1]
-    R = Rz * Ry * Rx
+    R = fec_rotation(Angle)
 
     # Relative position in EFCS, then rotate to ellipsoid body frame
     Δ = [p[1] - Center[1], p[2] - Center[2], p[3] - Center[3]]
