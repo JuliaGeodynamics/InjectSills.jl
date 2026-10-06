@@ -1,6 +1,12 @@
 using InjectSills, Test
 using GeophysicalModelGenerator
 
+# `--backend=CUDA|AMDGPU|Metal` adds GPU tests (Buildkite); the default runs the CPU tests only.
+backend_arg = filter(startswith("--backend="), ARGS)
+GPU_BACKEND = isempty(backend_arg) ? "CPU" : split(only(backend_arg), "=")[2]
+GPU_BACKEND in ("CPU", "CUDA", "AMDGPU", "Metal") ||
+    error("unknown backend $(repr(GPU_BACKEND)); use --backend=CPU|CUDA|AMDGPU|Metal")
+
 @testset "Penny shaped sill" begin
     include("PennyShapedSill.jl")
 end
@@ -37,6 +43,10 @@ end
     include("Test_Mogi_McTigue.jl")
 end
 
+@testset "Array displacement" begin
+    include("Test_ArrayDisplacement.jl")
+end
+
 @testset "Input validation" begin
     include("Test_InputValidation.jl")
 end
@@ -47,4 +57,10 @@ end
 
 @testset "JustPIC extension" begin
     include("Test_JustPIC.jl")
+end
+
+if GPU_BACKEND != "CPU"
+    @testset "GPU ($GPU_BACKEND)" begin
+        include("Test_GPU.jl")
+    end
 end
