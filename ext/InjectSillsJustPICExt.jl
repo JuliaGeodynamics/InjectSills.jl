@@ -34,15 +34,10 @@ function _inject_sill!(particles, D::NTuple{N}, xvi, sill::AbstractSill{N, _T};
     # empty particle slots have NaN coordinates
     hostrock_displacement!(map(d -> d.data, D), sill, coords; skipnan=true)
 
-    # move_particles! drops particles that transiently overfill a cell, which grows quickly
-    # with the per-call displacement; substeps keep it below 1/16 of a cell.
-    nsub = max(1, ceil(Int, 16 * maximum(k -> maximum(abs, D[k].data), 1:N) / minimum(particles.di.vertex)))
-    for _ in 1:nsub
-        for k in 1:N
-            coords[k] .+= D[k].data ./ nsub
-        end
-        move_particles!(particles, (D..., fields...))
+    for k in 1:N
+        coords[k] .+= D[k].data
     end
+    move_particles!(particles, (D..., fields...))
 
     if force_inject
         length(fields) == length(values) || throw(ArgumentError("fields and values must have the same length"))
