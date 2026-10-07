@@ -1,7 +1,7 @@
-module InjectSillsGLMakieExt
+module InjectSillsMakieExt
 
 using InjectSills
-using GLMakie
+using Makie
 
 """
     fig, ax = plot_sill(sill::Union{PennyShapedSill{2}, PlaneStrainSill}; scale=1.0, kwargs...)
