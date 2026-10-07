@@ -15,7 +15,7 @@ function InjectSills.plot_sill(
 ) where {_T}
     N     = 200
     theta = range(0, 2π; length=N)
-    x     = sill.W.val .* cos.(theta)
+    x     = sill.R.val .* cos.(theta)
     y     = (sill.H.val / 2) .* sin.(theta)
 
     outline = Point2{_T}.(x, y)

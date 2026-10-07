@@ -36,13 +36,13 @@ function dike_polygon(sill::EllipticalIntrusion{N, _T}, nump::Integer=101) where
 end
 
 function dike_polygon(sill::Union{PennyShapedSill{2, _T}, PlaneStrainSill{_T}}, nump::Integer=101) where {_T}
-    GeoParams.@unpack_val W, H, Center = sill
+    GeoParams.@unpack_val R, H, Center = sill
     n = max(4, Int(nump))
     p = range(zero(_T), stop=2 * π, length=n)
 
     poly = Vector{Point2{_T}}(undef, n)
     for (i, θ) in enumerate(p)
-        local_pt = Point2{_T}(cos(θ) * W, sin(θ) * (H / 2))
+        local_pt = Point2{_T}(cos(θ) * R, sin(θ) * (H / 2))
         poly[i] = rotate_point(local_pt, sill.RotMat.val') + Center
     end
 

@@ -179,3 +179,9 @@ function check_keywords(T, kwargs, valid)
     end
     return nothing
 end
+
+# `W` is the full width of the other sill types; `T` is sized by its radius or half-length `R`.
+function reject_W(T, what, W)
+    isnothing(W) || throw(ArgumentError("$T takes the $what `R`, not `W`"))
+    return nothing
+end

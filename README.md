@@ -17,9 +17,8 @@ Displacement field around a pressurized penny-shaped crack (Sun, 1969). A 2D sil
 ```julia
 sill = PennyShapedSill(
     Center = Point3(0.0, 0.0, -5000.0)*m,
-    W      = 2000.0m,     # radius
+    R      = 2000.0m,     # radius
     H      = 100.0m,      # maximum opening thickness
-    ΔP     = 1e6Pa,
     E      = 1.5e10Pa,
     ν      = 0.3*NoUnits,
     Angle  = Vec2(10.0, 0.0),   # dip, strike [degrees]
@@ -33,12 +32,12 @@ Reference: Sun, R.J. (1969): Theoretical size of hydraulically induced horizonta
 
 #### `PlaneStrainSill` — pressurized crack in plane strain (2D)
 
-Sill in a Cartesian 2D model: a crack of half-length `W` with the elliptical opening `H√(1 - x²/W²)`, where `H = 4(1-ν²) ΔP W/E`. Its cross-sectional area is `Q = π W H/2`; half of it crosses every line parallel to the sill on either side. Takes the same keywords as the 2D `PennyShapedSill`, with `Q` an area.
+Sill in a Cartesian 2D model: a crack of half-length `R` with the elliptical opening `H√(1 - x²/R²)`, where `H = 4(1-ν²) ΔP R/E`. Its cross-sectional area is `Q = π R H/2`; half of it crosses every line parallel to the sill on either side. Takes the same keywords as the 2D `PennyShapedSill`, with `Q` an area.
 
 ```julia
 sill = PlaneStrainSill(
     Center = Point2(0.0, -5000.0)*m,
-    W      = 2000.0m,     # half-length
+    R      = 2000.0m,     # half-length
     H      = 10.0m,       # maximum opening
     E      = 1.5e10Pa,
     ν      = 0.3*NoUnits,

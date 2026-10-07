@@ -1,8 +1,8 @@
 using Test
 using InjectSills
 
-sill2 = PennyShapedSill(Center=Point2(0.0, -5000.0)*m, Angle=Vec1(30.0), W=1000.0m, H=10.0m)
-sill3 = PennyShapedSill(Center=Point3(0.0, 0.0, -5000.0)*m, Angle=Vec2(20.0, 40.0), W=1000.0m, H=10.0m)
+sill2 = PennyShapedSill(Center=Point2(0.0, -5000.0)*m, Angle=Vec1(30.0), R=1000.0m, H=10.0m)
+sill3 = PennyShapedSill(Center=Point3(0.0, 0.0, -5000.0)*m, Angle=Vec2(20.0, 40.0), R=1000.0m, H=10.0m)
 X = [x for x in range(-2000.0, 2000.0, length=7), _ in 1:5]
 Y = [y for _ in 1:7, y in range(-1500.0, 1500.0, length=5)]
 Z = fill(-4900.0, 7, 5)
@@ -39,8 +39,8 @@ end
 @testset "Float32" begin
     function sills(::Type{F}) where {F}
         C2, C3 = Point2{F}(0, -5000)*m, Point3{F}(0, 0, -5000)*m
-        (PennyShapedSill(Center=C2, Angle=Vec1{F}(30)*NoUnits, W=F(1000)m, H=F(10)m, E=F(1.5e10)Pa, ν=F(0.3)*NoUnits),
-         PennyShapedSill(Center=C3, Angle=Vec2{F}(30, 45)*NoUnits, W=F(1000)m, H=F(10)m, E=F(1.5e10)Pa, ν=F(0.3)*NoUnits),
+        (PennyShapedSill(Center=C2, Angle=Vec1{F}(30)*NoUnits, R=F(1000)m, H=F(10)m, E=F(1.5e10)Pa, ν=F(0.3)*NoUnits),
+         PennyShapedSill(Center=C3, Angle=Vec2{F}(30, 45)*NoUnits, R=F(1000)m, H=F(10)m, E=F(1.5e10)Pa, ν=F(0.3)*NoUnits),
          EllipticalIntrusion(Center=C3, Angle=Vec2{F}(30, 45)*NoUnits, W=F(2000)m, H=F(200)m),
          McTigueSphere(Center=C3, r=F(1500)m, ΔP=F(10e6)Pa, G=F(10e9)Pa, ν=F(0.25)*NoUnits),
          FiniteEllipsoidalCavity(Center=C3, ax=F(500)m, ay=F(300)m, az=F(2000)m, Angle=Vec{3,F}(10, 20, 45)*NoUnits,

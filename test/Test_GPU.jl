@@ -13,7 +13,7 @@ function gpu_test_sills(::Type{F}) where {F}
     sills = AbstractSill[]
     for (C, A) in ((C2, A1), (C3, A2))
         push!(sills,
-            PennyShapedSill(Center=C, Angle=A, W=F(1000)m, H=F(10)m, E=F(1.5e10)Pa, ν=F(0.3)*NoUnits),
+            PennyShapedSill(Center=C, Angle=A, R=F(1000)m, H=F(10)m, E=F(1.5e10)Pa, ν=F(0.3)*NoUnits),
             SquareDike(Center=C, Angle=A, W=F(2000)m, H=F(100)m),
             SquareDikeTopAccretion(Center=C, Angle=A, W=F(2000)m, H=F(100)m),
             CylindricalDikeTopAccretion(Center=C, Angle=A, W=F(2000)m, H=F(100)m),
@@ -24,7 +24,7 @@ function gpu_test_sills(::Type{F}) where {F}
     end
     push!(sills, FiniteEllipsoidalCavity(Center=C3, ax=F(500)m, ay=F(300)m, az=F(2000)m,
         Angle=Vec{3,F}(10, 20, 45)*NoUnits, ΔP=F(1e6)Pa, mu=F(10e9)Pa, lambda=F(10e9)Pa))
-    push!(sills, PlaneStrainSill(Center=C2, Angle=A1, W=F(1000)m, H=F(10)m, E=F(1.5e10)Pa, ν=F(0.3)*NoUnits))
+    push!(sills, PlaneStrainSill(Center=C2, Angle=A1, R=F(1000)m, H=F(10)m, E=F(1.5e10)Pa, ν=F(0.3)*NoUnits))
     return sills
 end
 
@@ -54,8 +54,8 @@ end
                    (range(F(-5000), F(5000), length=17), range(F(-5000), F(5000), length=17), range(F(-10000), F(0), length=17))
     particles = init_particles(JPBackend, 12, 36, 6, gpu_staggered(xvi...)...)
     sill = N == 2 ?
-        PennyShapedSill(Center=Point2{F}(0, -5000)*m, H=F(40)m, W=F(2000)m, Angle=Vec1{F}(30)*NoUnits, E=F(1.5e10)Pa, ν=F(0.3)*NoUnits) :
-        PennyShapedSill(Center=Point3{F}(0, 0, -5000)*m, H=F(400)m, W=F(2000)m, Angle=Vec2{F}(0, 0)*NoUnits, E=F(1.5e10)Pa, ν=F(0.3)*NoUnits)
+        PennyShapedSill(Center=Point2{F}(0, -5000)*m, H=F(40)m, R=F(2000)m, Angle=Vec1{F}(30)*NoUnits, E=F(1.5e10)Pa, ν=F(0.3)*NoUnits) :
+        PennyShapedSill(Center=Point3{F}(0, 0, -5000)*m, H=F(400)m, R=F(2000)m, Angle=Vec2{F}(0, 0)*NoUnits, E=F(1.5e10)Pa, ν=F(0.3)*NoUnits)
     D..., phase = init_cell_arrays(particles, Val(N + 1))
     phase.data .= 1
     @test inject_sill!(particles, D..., xvi, sill; fields=(phase,), values=(F(2),), force_inject=true) === nothing

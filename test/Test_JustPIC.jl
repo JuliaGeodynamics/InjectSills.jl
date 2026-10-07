@@ -14,7 +14,7 @@ advected(sill, x, D) = hostrock_displacement(sill, Point(x .- D)) ≈ Vec(D)
 @testset "2D" begin
     xvi = (range(-5000.0, 5000.0, length=33), range(-10000.0, 0.0, length=33))
     particles = init_particles(JustPIC.CPU, 12, 30, 6, staggered(xvi...)...)
-    sill = PennyShapedSill(Center=Point2(0, -5000)*m, H=40.0m, W=2000.0m, Angle=Vec1(30))
+    sill = PennyShapedSill(Center=Point2(0, -5000)*m, H=40.0m, R=2000.0m, Angle=Vec1(30))
     Dx, Dy, phase = init_cell_arrays(particles, Val(3))
     phase.data .= 1.0
     @test inject_sill!(particles, Dx, Dy, xvi, sill; fields=(phase,), values=(2.0,), force_inject=true) === nothing
@@ -38,7 +38,7 @@ end
     xvi = (range(-5000.0, 5000.0, length=17), range(-5000.0, 5000.0, length=17),
            range(-10000.0, 0.0, length=17))
     particles = init_particles(JustPIC.CPU, 6, 18, 3, staggered(xvi...)...)
-    sill = PennyShapedSill(Center=Point3(0, 0, -5000)*m, H=400.0m, W=2000.0m, Angle=Vec2(0, 0))
+    sill = PennyShapedSill(Center=Point3(0, 0, -5000)*m, H=400.0m, R=2000.0m, Angle=Vec2(0, 0))
     Dx, Dy, Dz = init_cell_arrays(particles, Val(3))
     @test inject_sill!(particles, Dx, Dy, Dz, xvi, sill; force_inject=true) === nothing
     ok = vec(particles.index.data)

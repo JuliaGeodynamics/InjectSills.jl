@@ -23,19 +23,19 @@ sills_2d = [
     PennyShapedSill(
         Center = Point2(0.0, -5000.0) * m,
         Angle  = Vec1(0.0) * NoUnits,
-        W      = 1000.0m,
+        R      = 1000.0m,
         H      = 100.0m,
     ),
     PennyShapedSill(           # rotated
         Center = Point2(0.0, -5000.0) * m,
         Angle  = Vec1(30.0) * NoUnits,
-        W      = 1000.0m,
+        R      = 1000.0m,
         H      = 100.0m,
     ),
     PlaneStrainSill(           # rotated
         Center = Point2(0.0, -5000.0) * m,
         Angle  = Vec1(30.0) * NoUnits,
-        W      = 1000.0m,
+        R      = 1000.0m,
         H      = 100.0m,
     ),
     SquareDike(
@@ -113,13 +113,13 @@ sills_3d = [
     PennyShapedSill(
         Center = Point3(0.0, 0.0, -5000.0) * m,
         Angle  = Vec2(0.0, 0.0) * NoUnits,
-        W      = 1000.0m,
+        R      = 1000.0m,
         H      = 100.0m,
     ),
     PennyShapedSill(           # rotated dip + strike
         Center = Point3(0.0, 0.0, -5000.0) * m,
         Angle  = Vec2(30.0, 45.0) * NoUnits,
-        W      = 1000.0m,
+        R      = 1000.0m,
         H      = 100.0m,
     ),
     SquareDike(
@@ -213,7 +213,7 @@ end
 
 # Rotated sills: samples must cover the whole rotated body, not only its unrotated box
 @testset "new_point_inside_sill – rotated" begin
-    penny = PennyShapedSill(Center=Point3(0.0, 0.0, -5000.0)*m, W=1000.0m, H=1.0m, Angle=Vec2(45.0, 0.0))
+    penny = PennyShapedSill(Center=Point3(0.0, 0.0, -5000.0)*m, R=1000.0m, H=1.0m, Angle=Vec2(45.0, 0.0))
     pts   = [new_point_inside_sill(penny) for _ in 1:500]
     @test all(p -> inside(p, penny), pts)
     @test extrema(p[3] for p in pts)[2] - extrema(p[3] for p in pts)[1] > 1000   # spans ±707 m in depth

@@ -28,7 +28,7 @@ function main()
     yce = range(yc[1] - step(yv), yc[end] + step(yv), length=length(yc) + 2)
     particles = init_particles(backend, nxcell, max_xcell, min_xcell, (xv, yce), (xce, yv))
 
-    sill = PennyShapedSill(Center=Point2(0, -5000)*m, H=40.0m, W=2000.0m, Angle=Vec1(30))
+    sill = PennyShapedSill(Center=Point2(0, -5000)*m, H=40.0m, R=2000.0m, Angle=Vec1(30))
 
     Dx, Dy, phase = init_cell_arrays(particles, Val(3))
     phase.data .= HOST
