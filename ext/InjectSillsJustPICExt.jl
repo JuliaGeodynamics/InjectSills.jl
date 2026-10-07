@@ -1,8 +1,9 @@
 module InjectSillsJustPICExt
 
 using InjectSills
-using InjectSills: local_to_world, random_point_in_bbox
+using InjectSills: local_to_world
 using JustPIC
+using KernelAbstractions, Adapt
 
 """
     inject_sill!(particles, Dx, Dy, xvi, sill::AbstractSill{2}; fields=(), values=(), force_inject=false)
@@ -12,12 +13,14 @@ Displace JustPIC `particles` by the host-rock displacement of `sill` and move th
 their new cells. `Dx`, `Dy` (, `Dz`) are `CellArray`s from `init_cell_arrays`; they
 return the displacement of each particle. `fields` are further particle `CellArray`s
 (e.g. phase, temperature) that move with the particles. `xvi` is not used; the grid
-is taken from `particles`. The displacements are evaluated on all `Threads.nthreads()`
-threads.
+is taken from `particles`. The displacements are computed with `hostrock_displacement!`.
 
 With `force_inject=true`, the sill is then filled with new particles at the initial
 density `particles.nxcell` per cell, and each of `fields` is set to the matching entry
 of `values` on them.
+
+All work runs on the backend of `particles` (CPU or GPU). On a GPU, the sill's float type
+must be supported by the device, e.g. `Float32` on Metal.
 """
 InjectSills.inject_sill!(particles, Dx, Dy, xvi, sill::AbstractSill{2}; kwargs...) =
     _inject_sill!(particles, (Dx, Dy), xvi, sill; kwargs...)
@@ -28,13 +31,8 @@ InjectSills.inject_sill!(particles, Dx, Dy, Dz, xvi, sill::AbstractSill{3}; kwar
 function _inject_sill!(particles, D::NTuple{N}, xvi, sill::AbstractSill{N, _T};
                        fields=(), values=(), force_inject=false) where {N, _T}
     coords = map(c -> c.data, particles.coords)
-    Threads.@threads for I in eachindex(coords[1])
-        p = Point{N, _T}(ntuple(k -> coords[k][I], Val(N)))
-        d = isnan(p) ? zero(Vec{N, _T}) : hostrock_displacement(sill, p)
-        for k in 1:N
-            D[k].data[I] = d[k]
-        end
-    end
+    # empty particle slots have NaN coordinates
+    hostrock_displacement!(map(d -> d.data, D), sill, coords; skipnan=true)
 
     # move_particles! drops particles that transiently overfill a cell, which grows quickly
     # with the per-call displacement; substeps keep it below 1/16 of a cell.
@@ -55,28 +53,53 @@ function _inject_sill!(particles, D::NTuple{N}, xvi, sill::AbstractSill{N, _T};
 end
 
 # New particles inside `sill`, slot-aligned with `particles.index` as `force_injection!`
-# expects. Each cell overlapping the sill draws `nxcell` uniform candidates and keeps those
-# inside the sill, which reproduces the initial particle density, and places them in the
-# cell's free slots.
+# expects, on the backend of `particles`. Each cell overlapping the sill draws `nxcell`
+# uniform candidates and keeps those inside the sill, which reproduces the initial particle
+# density, and places them in the cell's free slots.
 function sill_particles(particles, sill::AbstractSill{N, _T}) where {N, _T}
     (; index, nxcell, xvi) = particles
-    p_new = fill(Point{N, _T}(ntuple(_ -> _T(NaN), Val(N))), size(index)..., cellnum(index))
+    backend = get_backend(index.data)
+    p_new = KernelAbstractions.allocate(backend, Point{N, _T}, size(index)..., cellnum(index))
+    fill!(p_new, Point{N, _T}(ntuple(_ -> _T(NaN), Val(N))))
+
+    # Cells overlapping the sill's bounding box; cell i spans xv[i]..xv[i+1]
     lo_s, hi_s = world_bounding_box(sill)
-    for I in CartesianIndices(index)
-        lo = Point{N, _T}(ntuple(k -> xvi[k][I[k]], Val(N)))
-        hi = Point{N, _T}(ntuple(k -> xvi[k][I[k] + 1], Val(N)))
-        (all(lo .<= hi_s) && all(lo_s .<= hi)) || continue
-        free = findall(!, index[I])
-        n = 0
-        for _ in 1:nxcell
-            p = random_point_in_bbox(lo, hi)
-            inside(p, sill) || continue
-            n += 1
-            n > length(free) && break
-            p_new[I, free[n]] = p
-        end
-    end
+    xv = map(Array, xvi)
+    cells = CartesianIndices(ntuple(Val(N)) do k
+        max(searchsortedlast(xv[k], lo_s[k]), 1):min(searchsortedfirst(xv[k], hi_s[k]) - 1, length(xv[k]) - 1)
+    end)
+    isempty(cells) && return p_new
+
+    # candidate positions within each cell, as fractions of the cell size
+    R = adapt(backend, rand(_T, N, nxcell, size(cells)...))
+    offset = first(cells) - oneunit(first(cells))
+    sill_particles_kernel!(backend)(p_new, index, xvi, R, adapt(backend, sill), offset; ndrange = size(cells))
+    synchronize(backend)
     return p_new
+end
+
+@kernel function sill_particles_kernel!(p_new, index, xvi, R, sill, offset)
+    J = @index(Global, Cartesian)
+    fill_cell!(p_new, index, xvi, R, sill, J, offset)
+end
+
+function fill_cell!(p_new, index, xvi, R, sill::AbstractSill{N, _T}, J, offset) where {N, _T}
+    I  = Tuple(J + offset)
+    lo = Point{N, _T}(ntuple(k -> xvi[k][I[k]], Val(N)))
+    hi = Point{N, _T}(ntuple(k -> xvi[k][I[k] + 1], Val(N)))
+    ip = 0
+    for c in axes(R, 2)
+        p = Point{N, _T}(ntuple(k -> lo[k] + R[k, c, Tuple(J)...] * (hi[k] - lo[k]), Val(N)))
+        inside(p, sill) || continue
+        # next free slot (JustPIC.doskip is true for an empty slot)
+        ip += 1
+        while ip <= cellnum(index) && !JustPIC.doskip(index, ip, I...)
+            ip += 1
+        end
+        ip > cellnum(index) && break
+        p_new[I..., ip] = p
+    end
+    return nothing
 end
 
 # World-frame axis-aligned box enclosing the (rotated) sill.

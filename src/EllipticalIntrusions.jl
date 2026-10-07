@@ -10,7 +10,7 @@ struct EllipticalIntrusion{N, _T, N1, N2, U1, U2, U3} <: AbstractSill{N, _T}
     W::GeoUnit{_T, U1}
     H::GeoUnit{_T, U1}
     Lengthscale::GeoUnit{_T, U1}
-    BoundingBox::Tuple
+    BoundingBox::NTuple{2, GeoUnit{Point{N, _T}, U1}}
     RotMat::GeoUnit{SMatrix{N, N, _T, N2}, U3}
 end
 Adapt.@adapt_structure EllipticalIntrusion
@@ -66,6 +66,13 @@ end
 area(s::EllipticalIntrusion) = π * UnitValue(s.W) / 2 * UnitValue(s.H) / 2
 volume(s::EllipticalIntrusion) = (4 / 3) * π * (UnitValue(s.W) / 2) * (UnitValue(s.W) / 2) * (UnitValue(s.H) / 2)
 
+# Cube root of x > 0 that GPU kernels can compile: Base.cbrt(::Float32) refines in Float64,
+# and Metal.jl < 1.11 has no device cbrt. One Newton step restores full precision.
+function kernel_cbrt(x)
+    c = exp(log(x) / 3)
+    return c - (c^3 - x) / (3 * c^2)
+end
+
 function hostrock_displacement(sill::EllipticalIntrusion{N, _T}, p::Point{N, _T}) where {N, _T}
     GeoParams.@unpack_val W, H, Center, RotMat = sill
     p_r = rotate_point(p - Center, RotMat)
@@ -77,10 +84,11 @@ function hostrock_displacement(sill::EllipticalIntrusion{N, _T}, p::Point{N, _T}
         if a == 0
             return Vec2{_T}(zero(_T), zero(_T))
         end
-        a3 = a^3
-        a_inject = W / 2
-        Vol_inject = (4 / 3) * π * a_inject^3 * AR
-        da = ((Vol_inject + (4 / 3) * π * a3 * AR) / ((4 / 3) * π * AR))^(1 / 3) - a
+        # The injected volume (W/2)³ is added to the ellipsoid of semi-axis a:
+        # da = cbrt((W/2)³ + a³) - a, written without cancellation for a ≫ W/2
+        b  = (W / 2)^3
+        c  = kernel_cbrt(b + a^3)
+        da = b / (c^2 + c * a + a^2)
         d_r = Vec2{_T}(x * (da / a), z * (da / a))
         return rotate_point(d_r, RotMat')
     else
@@ -91,10 +99,11 @@ function hostrock_displacement(sill::EllipticalIntrusion{N, _T}, p::Point{N, _T}
         if a == 0
             return Vec3{_T}(zero(_T), zero(_T), zero(_T))
         end
-        a3 = a^3
-        a_inject = W / 2
-        Vol_inject = (4 / 3) * π * a_inject^3 * AR
-        da = ((Vol_inject + (4 / 3) * π * a3 * AR) / ((4 / 3) * π * AR))^(1 / 3) - a
+        # The injected volume (W/2)³ is added to the ellipsoid of semi-axis a:
+        # da = cbrt((W/2)³ + a³) - a, written without cancellation for a ≫ W/2
+        b  = (W / 2)^3
+        c  = kernel_cbrt(b + a^3)
+        da = b / (c^2 + c * a + a^2)
         d_r = Vec3{_T}(x * (da / a), y * (da / a), z * (da / a))
         return rotate_point(d_r, RotMat')
     end

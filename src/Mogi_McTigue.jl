@@ -32,7 +32,7 @@ struct MogiSphere{N, _T, U1, U2, U3} <: AbstractSill{N, _T}
     G::GeoUnit{_T, U2}
     ν::GeoUnit{_T, U3}
     Lengthscale::GeoUnit{_T, U1}
-    BoundingBox::Tuple
+    BoundingBox::NTuple{2, GeoUnit{Point{N, _T}, U1}}
 end
 Adapt.@adapt_structure MogiSphere
 
@@ -131,7 +131,7 @@ struct McTigueSphere{N, _T, U1, U2, U3} <: AbstractSill{N, _T}
     G::GeoUnit{_T, U2}
     ν::GeoUnit{_T, U3}
     Lengthscale::GeoUnit{_T, U1}
-    BoundingBox::Tuple
+    BoundingBox::NTuple{2, GeoUnit{Point{N, _T}, U1}}
 end
 Adapt.@adapt_structure McTigueSphere
 
@@ -224,8 +224,7 @@ function hostrock_displacement(sill::MogiSphere{N, _T}, p::Point{N, _T}) where {
     for i in 1:N
         R_sq += Δ[i]^2
     end
-    R = sqrt(R_sq)
-    if R < 1e-8; R = convert(_T, 1e-8); end
+    R = max(sqrt(R_sq), _T(1e-8))
 
     C = r^3 * ΔP * (1 - ν) / (G * R^3)
 
@@ -251,11 +250,9 @@ function hostrock_displacement(sill::McTigueSphere{N, _T}, p::Point{N, _T}) wher
     for i in 1:N
         R_sq += Δ[i]^2
     end
-    R = sqrt(R_sq)
-    if R < 1e-8; R = convert(_T, 1e-8); end
+    R = max(sqrt(R_sq), _T(1e-8))
 
-    d = abs(Center[N])
-    if d < 1e-8; d = convert(_T, 1e-8); end
+    d = max(abs(Center[N]), _T(1e-8))
 
     C = r^3 * ΔP * (1 - ν) / (G * R^3)
 

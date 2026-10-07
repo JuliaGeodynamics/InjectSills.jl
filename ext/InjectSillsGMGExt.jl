@@ -51,26 +51,8 @@ function InjectSills.surface_displacement(
         throw(ArgumentError("surface_displacement: the sill must have lengths in m (CartData coordinates in km are converted to m); got $got"))
     end
 
-    x_km = cart.x.val   # arrays in km
-    y_km = cart.y.val
-    z_km = cart.z.val
-
-    Ux = similar(x_km, Float64)
-    Uy = similar(x_km, Float64)
-    Uz = similar(x_km, Float64)
-
-    for I in eachindex(x_km)
-        # convert km → m for the displacement calculation
-        p = Point3{Float64}(
-            Float64(x_km[I]) * 1e3,
-            Float64(y_km[I]) * 1e3,
-            Float64(z_km[I]) * 1e3,
-        )
-        d = hostrock_displacement(sill, p)
-        Ux[I] = d[1]
-        Uy[I] = d[2]
-        Uz[I] = d[3]
-    end
+    X = map(c -> _T.(1e3 .* c), (cart.x.val, cart.y.val, cart.z.val))   # km → m
+    Ux, Uy, Uz = hostrock_displacement!(ntuple(_ -> similar(X[1]), 3), sill, X)
 
     if add_fields
         Displacement_m = (Ux, Uy, Uz)

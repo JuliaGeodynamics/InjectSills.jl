@@ -1,4 +1,4 @@
-using Test
+using Test, InteractiveUtils
 using GeoParams, InjectSills
 
 CharDim = GEO_units(length=1000m, temperature=1000C, stress=10Pa, viscosity=1e20Pas)
@@ -49,3 +49,18 @@ e3 = EllipticalIntrusion(Center=Point3(0.0, 0.0, -5000.0)*m, Angle=Vec2(0.0, 0.0
 
 d3 = hostrock_displacement(e3, Point3(200.0, 100.0, -4980.0))
 @test !any(isnan, Tuple(d3))
+
+@testset "cube rule and Float32" begin
+    for N in (2, 3)
+        C, A = N == 2 ? (Point2(0.0, 0.0), Vec1(0.0)) : (Point3(0.0, 0.0, 0.0), Vec2(0.0, 0.0))
+        e = EllipticalIntrusion(Center=C*m, Angle=A*NoUnits, W=1000.0m, H=100.0m)
+        # a point at a in the sill plane moves to ∛(a³ + (W/2)³), also far away
+        for a in (800.0, 1e6)
+            @test hostrock_displacement(e, Point{N}([a; zeros(N - 1)]...))[1] ≈ Float64(cbrt(big(a)^3 + big(500.0)^3) - a) rtol=1e-12
+        end
+        e32 = EllipticalIntrusion(Center=Point{N, Float32}(C)*m, Angle=Vec{N - 1, Float32}(A)*NoUnits, W=1000f0m, H=100f0m)
+        p = [fill(700.0, N - 1); -200.0]
+        @test hostrock_displacement(e32, Point{N, Float32}(p...)) ≈ hostrock_displacement(e, Point{N}(p...)) rtol=1e-6
+        @test !occursin("Float64", string(code_typed(hostrock_displacement, (typeof(e32), Point{N, Float32}))))
+    end
+end

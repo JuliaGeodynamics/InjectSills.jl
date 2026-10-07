@@ -41,7 +41,7 @@ struct PennyShapedSill{N, _T, N1, N2, U1, U2, U3, U4, U5} <: AbstractSill{N,_T}
     W::GeoUnit{_T,U1}   # m
     H::GeoUnit{_T,U1}   # m
     Lengthscale::GeoUnit{_T,U1}
-    BoundingBox::Tuple
+    BoundingBox::NTuple{2, GeoUnit{Point{N, _T}, U1}}
     RotMat::GeoUnit{SMatrix{N,N,_T,N2},U4}             # rotation matrix (precomputed for efficiency)
     RotMat_negative::GeoUnit{SMatrix{N,N,_T,N2},U4}    # with negative angle
 end
@@ -76,7 +76,7 @@ function PennyShapedSill(; W=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e
     if isnothing(W) && isnothing(Q) && isnothing(ΔP) && isnothing(H)
         ΔP  =  1e6*Pa
         Q   =  1000.0*m^3
-        W   =  (3*E*Q/(16*(1-ν^2)*ΔP))^(1.0/3.0)
+        W   =  cbrt(3*E*Q/(16*(1-ν^2)*ΔP))
         H   =  8*(1-ν^2)*ΔP*W/(π*E)
 
     elseif isnothing(W) && isnothing(Q) && !isnothing(ΔP) && isnothing(H)
@@ -84,38 +84,38 @@ function PennyShapedSill(; W=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e
         # user-provided overpressure.
         Q_ref = 1000.0*m^3
         ΔP_ref = 1e6*Pa
-        W   =  (3*E*Q_ref/(16*(1-ν^2)*ΔP_ref))^(1.0/3.0)
+        W   =  cbrt(3*E*Q_ref/(16*(1-ν^2)*ΔP_ref))
         H   =  8*(1-ν^2)*ΔP*W/(π*E)
         Q   =  16*(1-ν^2)*ΔP*W^3/(3*E)
 
     elseif isnothing(W) && !isnothing(Q) && !isnothing(ΔP) && isnothing(H)
-        W   =  (3*E*Q/(16*(1-ν^2)*ΔP))^(1.0/3.0)
+        W   =  cbrt(3*E*Q/(16*(1-ν^2)*ΔP))
         H   =  8*(1-ν^2)*ΔP*W/(π*E)
 
     elseif isnothing(W) && !isnothing(Q) && isnothing(ΔP) && isnothing(H)
         ΔP  =  1e6*Pa
-        W   =  (3*E*Q/(16*(1-ν^2)*ΔP))^(1.0/3.0)
+        W   =  cbrt(3*E*Q/(16*(1-ν^2)*ΔP))
         H   =  8*(1-ν^2)*ΔP*W/(π*E)
 
     elseif !isnothing(W) && !isnothing(Q)
         ΔP = 3*E*Q/(16*(1-ν^2)*W^3)
-        H  = (3 * Q) / (2 * π * W^2)
+        H  = (3 * Q) / (2 * W^2 * π)
 
     elseif !isnothing(W) && !isnothing(H)
         ΔP = (π * E * H) / (8 * (1 - ν^2) * W)
-        Q = (2 * π * H * W^2) / 3
+        Q = (2 * H * W^2 * π) / 3
 
     elseif !isnothing(W) && !isnothing(ΔP)
         H = 8 * (1 - ν^2) * ΔP * W / (π * E)
         Q = 16 * (1 - ν^2) * ΔP * W^3 / (3 * E)
 
     elseif !isnothing(H) && !isnothing(Q)
-        W = sqrt(3 * Q / (2 * π * H))
+        W = sqrt(3 * Q / (2 * H * π))
         ΔP = (π * E * H) / (8 * (1 - ν^2) * W)
 
     elseif !isnothing(H) && !isnothing(ΔP)
         W = (π * E * H) / (8 * (1 - ν^2) * ΔP)
-        Q = (π^3 * E^2 * H^3) / (96 * (1 - ν^2)^2 * ΔP^2)
+        Q = 16 * (1 - ν^2) * ΔP * W^3 / (3 * E)
     end
 
     # Compute rotation matrix - as this is a relatively expensive operation, we precompute & store it in the struct
@@ -276,8 +276,8 @@ function hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T}) whe
     z = abs(Δ[N])
 
     # Function below cannot deal with zero
-    if r==0; r=1e-8; end
-    if z==0; z=1e-8; end
+    if r==0; r=_T(1e-8); end
+    if z==0; z=_T(1e-8); end
 
     # Compute displacement, using complex functions
     # Remark: this may not work on GPU's, so we would have to mimic this effect somehow
@@ -335,6 +335,11 @@ function compute_penny_shaped_displacement(r, z, ΔP, ν, E, W)
 end
 
 
+# Complex division. Base divides Complex{Float32} in Float64, which GPUs without
+# Float64 support (Metal) cannot compile.
+cdiv(a, b) = a / b
+cdiv(a, b::Complex{Float32}) = a * conj(b) / abs2(b)
+
 """
     compute_penny_shaped_displacement_complex(r, z, ΔP, ν, E, W)
 
@@ -342,21 +347,21 @@ Compute the displacement around a penny-shaped sill in a homogeneous elastic hal
 """
 function compute_penny_shaped_displacement_complex(r, z, ΔP, ν, E, W)
     imW = im*W
-    R1  = sqrt(r^2. + (z - imW)^2);
-    R2  = sqrt(r^2. + (z + imW)^2);
-    L   = log((R2+z+imW)/(R1+z-imW))
+    R1  = sqrt(r^2 + (z - imW)^2);
+    R2  = sqrt(r^2 + (z + imW)^2);
+    L   = log(cdiv(R2+z+imW, R1+z-imW))
 
     # equation 7a:
-    dU  = im*ΔP*(1+ν)*(1-2ν)/(2pi*E)*( r*L
-            - r/2*((imW-3z-R2)/(R2+z+imW)
-            + (R1+3z+imW)/(R1+z-imW))
-            - (2z^2 * r)/(1 -2ν)*(1/(R2*(R2+z+imW)) -1/(R1*(R1+z-imW)))
-            + (2*z*r)/(1-2ν)*(1/R2 - 1/R1) );
+    dU  = im*ΔP*(1+ν)*(1-2ν)/(2*E*π)*( r*L
+            - r/2*(cdiv(imW-3z-R2, R2+z+imW)
+            + cdiv(R1+3z+imW, R1+z-imW))
+            - (2z^2 * r)/(1 -2ν)*(cdiv(1, R2*(R2+z+imW)) - cdiv(1, R1*(R1+z-imW)))
+            + (2*z*r)/(1-2ν)*(cdiv(1, R2) - cdiv(1, R1)) );
 
     # equation 7b:
     dW  = 2*im*ΔP*(1-ν^2)/(pi*E)*( z*L
             - (R2-R1)
-            - 1/(2*(1-ν))*( z*L - imW*z*(1/R2 + 1/R1)) );
+            - 1/(2*(1-ν))*( z*L - imW*z*(cdiv(1, R2) + cdiv(1, R1))) );
 
     Uz =  real(dW);  # vertical displacement should be corrected for z<0
     Ur =  real(dU);

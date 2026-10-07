@@ -1,7 +1,7 @@
 
 # few helper routines such as rotation matrixes 
-using StaticArrays, GeometryBasics
-export new_point_inside_sill
+using StaticArrays, GeometryBasics, KernelAbstractions, Adapt
+export new_point_inside_sill, hostrock_displacement!
 
 function RotationMatrix(Angle::Vec{1, _T})  where {_T}
     sinDipAngle, cosDipAngle  = sincosd(Angle[1])
@@ -43,38 +43,59 @@ function rotate_point(p::Vec{3,_T}, RotMat::SMatrix{3,3,_T,9}) where {_T}
 end
 
 """
-    dX,dY,dZ = hostrock_displacement(sill::AbstractSill{3,_T}, X::AbstractArray{_T,N},Y::AbstractArray{_T,N},Z::AbstractArray{_T,N})
+    dX, dY, dZ = hostrock_displacement(sill::AbstractSill{3,_T}, X::AbstractArray{_T}, Y::AbstractArray{_T}, Z::AbstractArray{_T})
 
-Creates a 3D displacement field caused by a magma-filles sill intrusion at the points `X,Y,Z`
+Displacement field of `sill` at the points `X`, `Y`, `Z`, computed with [`hostrock_displacement!`](@ref).
 """
-function  hostrock_displacement(sill::AbstractSill{3,_T}, X::AbstractArray{_T,N},Y::AbstractArray{_T,N},Z::AbstractArray{_T,N}) where {N,_T}
-    Dx = zero(X)
-    Dy = zero(X)
-    Dz = zero(X)
-    
-    for I in CartesianIndices(X)
-        p = Point3{_T}(X[I], Y[I], Z[I])
-        Dx[I], Dy[I], Dz[I] = hostrock_displacement(sill, p)    
-    end
-
-    return Dx, Dy, Dz
+function hostrock_displacement(sill::AbstractSill{3,_T}, X::AbstractArray{_T,N}, Y::AbstractArray{_T,N}, Z::AbstractArray{_T,N}) where {N,_T}
+    return hostrock_displacement!((similar(X), similar(X), similar(X)), sill, (X, Y, Z))
 end
 
 """
-    dX,dZ = hostrock_displacement(sill::AbstractSill{2,_T}, X::AbstractArray{_T,N}, Z::AbstractArray{_T,N})
+    dX, dZ = hostrock_displacement(sill::AbstractSill{2,_T}, X::AbstractArray{_T}, Z::AbstractArray{_T})
 
-Creates a 2D displacement field caused by a magma-filles sill intrusion at the points `X,Z`
+Displacement field of `sill` at the points `X`, `Z`, computed with [`hostrock_displacement!`](@ref).
 """
-function  hostrock_displacement(sill::AbstractSill{2,_T}, X::AbstractArray{_T,N},Z::AbstractArray{_T,N}) where {N,_T}
-    Dx = zero(X)
-    Dz = zero(X)
-    
-    for I in CartesianIndices(X)
-        p = Point2{_T}(X[I], Z[I])
-        Dx[I], Dz[I] = hostrock_displacement(sill, p)    
-    end
+function hostrock_displacement(sill::AbstractSill{2,_T}, X::AbstractArray{_T,N}, Z::AbstractArray{_T,N}) where {N,_T}
+    return hostrock_displacement!((similar(X), similar(X)), sill, (X, Z))
+end
 
-    return Dx, Dz
+"""
+    D = hostrock_displacement!(D, sill::AbstractSill{N}, X; skipnan=false)
+
+Write the displacement of `sill` at the points `(X[1][i], …, X[N][i])` to
+`(D[1][i], …, D[N][i])` for every index `i`, and return `D`. `D` and `X` are `N`-tuples of
+arrays with identical axes. The points are evaluated in parallel by a KernelAbstractions
+kernel on the backend of `X[1]`. With `skipnan=true`, points with a `NaN` coordinate get
+zero displacement.
+"""
+function hostrock_displacement!(D::NTuple{N, AbstractArray}, sill::AbstractSill{N}, X::NTuple{N, AbstractArray}; skipnan::Bool=false) where {N}
+    ax = axes(X[1])
+    all(A -> axes(A) == ax, (X..., D...)) ||
+        throw(DimensionMismatch("hostrock_displacement!: all arrays must have axes $ax; got $(map(axes, (X..., D...)))"))
+    check_points(sill, X)
+    backend = get_backend(X[1])
+    # moves array fields of the sill (FiniteEllipsoidalCavity sources) to the backend
+    displacement_kernel!(backend)(D, adapt(backend, sill), X, skipnan; ndrange = length(X[1]))
+    synchronize(backend)
+    return D
+end
+
+# Point displacement inside the kernel, where nothing may throw (GPU kernels cannot build
+# error messages); `check_points` validates the inputs on the host before the launch.
+kernel_displacement(sill, p) = hostrock_displacement(sill, p)
+check_points(sill, X) = nothing
+
+@kernel function displacement_kernel!(D, sill, X, skipnan)
+    i = @index(Global, Linear)
+    displacement_at!(D, sill, X, i, skipnan)
+end
+
+function displacement_at!(D, sill::AbstractSill{N, _T}, X, i, skipnan) where {N, _T}
+    p = Point{N, _T}(ntuple(k -> X[k][i], Val(N)))
+    d = skipnan && isnan(p) ? zero(Vec{N, _T}) : kernel_displacement(sill, p)
+    ntuple(k -> (D[k][i] = d[k]), Val(N))
+    return nothing
 end
 
 

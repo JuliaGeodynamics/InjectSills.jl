@@ -217,6 +217,15 @@ end
     @test all(p -> inside(p, fec), [new_point_inside_sill(fec) for _ in 1:500])
 end
 
+# Sills are passed to GPU kernels by value; FiniteEllipsoidalCavity holds arrays, which
+# `hostrock_displacement!` moves to the device with Adapt.
+@testset "isbits" begin
+    for s in vcat(sills_2d, sills_3d)
+        s isa FiniteEllipsoidalCavity && continue
+        @test isbitstype(typeof(s))
+    end
+end
+
 # ---- safety net: fail if a new AbstractSill subtype has no test instance ---
 @testset "coverage – all AbstractSill subtypes are tested" begin
     registered = Set(nameof(S) for S in subtypes(InjectSills.AbstractSill))

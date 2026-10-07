@@ -16,7 +16,7 @@ struct SquareDikeTopAccretion{N, _T, N1, N2, U1, U2, U3} <: AbstractSill{N, _T}
     W::GeoUnit{_T, U1}
     H::GeoUnit{_T, U1}
     Lengthscale::GeoUnit{_T, U1}
-    BoundingBox::Tuple
+    BoundingBox::NTuple{2, GeoUnit{Point{N, _T}, U1}}
     RotMat::GeoUnit{SMatrix{N, N, _T, N2}, U3}
 end
 Adapt.@adapt_structure SquareDikeTopAccretion

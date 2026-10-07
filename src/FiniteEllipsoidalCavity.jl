@@ -147,7 +147,9 @@ returned by `fECM`.
 function fecm_sources(X0, Y0, depth, omegaX, omegaY, omegaZ,
                       ax, ay, az, p, mu, lambda, DepthRef;
                       Nmax=5e3, Cr=14)
-    
+    # The grid is built in Float64; the returned sources use the float type of the geometry.
+    T = float(promote_type(typeof(X0), typeof(Y0), typeof(depth), typeof(ax), typeof(ay), typeof(az)))
+
     # Get top and bottom of ellipsoid
     Zt, Zb = EllTopBot(depth, omegaX, omegaY, omegaZ, ax, ay, az)
     
@@ -216,11 +218,12 @@ function fecm_sources(X0, Y0, depth, omegaX, omegaY, omegaZ,
     # Orientation of the PTDs along the rotated X, Y, Z axes: (sin, cos) of strike - 90 and of dip
     R = fec_rotation((omegaX, omegaY, omegaZ))
     ptd = ntuple(Val(3)) do j
-        strike = iszero(hypot(R[1, j], R[2, j])) ? 0.0 : atand(-R[2, j], R[1, j])
-        (sincosd(strike - 90)..., sincosd(acosd(R[3, j]))...)
+        strike = iszero(hypot(R[1, j], R[2, j])) ? zero(R[1, j]) : atand(-R[2, j], R[1, j])
+        T.((sincosd(strike - 90)..., sincosd(acosd(R[3, j]))...))
     end
 
-    return (; x0 = Xs, y0 = Ys, d = -Zs, DV = (DVx * Ws, DVy * Ws, DVz * Ws), ptd, nu, dV, DVtot = DV, Ns)
+    return (; x0 = T.(Xs), y0 = T.(Ys), d = T.(-Zs), DV = (T.(DVx * Ws), T.(DVy * Ws), T.(DVz * Ws)),
+              ptd, nu = T(nu), dV = T(dV), DVtot = T(DV), Ns)
 end
 
 # Surface displacements (ue, un, uv) at `X`, `Y` and the source summary of `fECM`.
@@ -243,22 +246,26 @@ function pcdm_surf(x, y, src)
         sb, cb, sd, cd = ptd[j]
         DVj = DV[j]
         e0 = n0 = v0 = zero(ue)
-        for k in eachindex(x0, y0, d, DVj)
+        # x0, y0, d, DVj share their indices (fecm_sources); the multi-array eachindex
+        # would build an error message, which GPU kernels cannot
+        for k in eachindex(x0)
             xM, yM, dk = x - x0[k], y - y0[k], d[k]
             # PTD frame
             xr = xM * cb - yM * sb
             yr = xM * sb + yM * cb
             r  = sqrt(xr^2 + yr^2 + dk^2)
+            r3 = r^3
+            r5 = r3 * r^2   # Base computes Float32 ^5 in Float64
             q  = yr * sd - dk * cd
-            I1 = (1 - 2nu) * yr * (1 / r / (r + dk)^2 - xr^2 * (3r + dk) / r^3 / (r + dk)^3)
-            I2 = (1 - 2nu) * xr * (1 / r / (r + dk)^2 - yr^2 * (3r + dk) / r^3 / (r + dk)^3)
-            I3 = (1 - 2nu) * xr / r^3 - I2
-            I5 = (1 - 2nu) * (1 / r / (r + dk) - xr^2 * (2r + dk) / r^3 / (r + dk)^2)
+            I1 = (1 - 2nu) * yr * (1 / r / (r + dk)^2 - xr^2 * (3r + dk) / r3 / (r + dk)^3)
+            I2 = (1 - 2nu) * xr * (1 / r / (r + dk)^2 - yr^2 * (3r + dk) / r3 / (r + dk)^3)
+            I3 = (1 - 2nu) * xr / r3 - I2
+            I5 = (1 - 2nu) * (1 / r / (r + dk) - xr^2 * (2r + dk) / r3 / (r + dk)^2)
             # For a PTD M0 = DV*mu
-            c  = DVj[k] / (2π)
-            e0 += c * (3xr * q^2 / r^5 - I3 * sd^2)
-            n0 += c * (3yr * q^2 / r^5 - I1 * sd^2)
-            v0 += c * (3dk * q^2 / r^5 - I5 * sd^2)
+            c  = DVj[k] / 2 / π
+            e0 += c * (3xr * q^2 / r5 - I3 * sd^2)
+            n0 += c * (3yr * q^2 / r5 - I1 * sd^2)
+            v0 += c * (3dk * q^2 / r5 - I5 * sd^2)
         end
         # Rotate back to EFCS
         ue +=  e0 * cb + n0 * sb
@@ -1077,7 +1084,7 @@ struct FiniteEllipsoidalCavity{_T, U1, U2, U3, S} <: AbstractSill{3, _T}
     ay::GeoUnit{_T, U1}
     az::GeoUnit{_T, U1}
     Lengthscale::GeoUnit{_T, U1}
-    BoundingBox::Tuple
+    BoundingBox::NTuple{2, GeoUnit{Point{3, _T}, U1}}
     Angle::GeoUnit{Vec{3, _T}, U2}
     ΔP::GeoUnit{_T, U3}
     mu::GeoUnit{_T, U3}
@@ -1220,22 +1227,29 @@ surface, so a point with `p[3] != 0` throws an `ArgumentError`.
 """
 function hostrock_displacement(fec::FiniteEllipsoidalCavity, p::Point{3, _T}) where _T
     iszero(p[3]) || throw(ArgumentError("FiniteEllipsoidalCavity gives surface displacement only; got z = $(p[3]), expected 0"))
-    return Vec3{_T}(pcdm_surf(p[1], p[2], fec.Sources)...)
+    return kernel_displacement(fec, p)
 end
+
+kernel_displacement(fec::FiniteEllipsoidalCavity, p::Point{3, _T}) where {_T} = Vec3{_T}(pcdm_surf(p[1], p[2], fec.Sources)...)
+
+check_points(::FiniteEllipsoidalCavity, X) = all(iszero, X[3]) ||
+    throw(ArgumentError("FiniteEllipsoidalCavity gives surface displacement only; all z coordinates must be 0"))
 
 
 # Body-to-EFCS rotation of the cavity axes for angles (omegaX, omegaY, omegaZ) in degrees.
+# `sincos(deg2rad(ω))`, not `sincosd`: Base evaluates `sincosd(::Float32)` in Float64,
+# which GPU kernels calling `inside` cannot compile on Metal.
 function fec_rotation(Angle)
-    omegaX, omegaY, omegaZ = Angle[1], Angle[2], Angle[3]
-    Rx = @SMatrix [1  0              0;
-                   0  cosd(omegaX)   sind(omegaX);
-                   0 -sind(omegaX)   cosd(omegaX)]
-    Ry = @SMatrix [cosd(omegaY)  0  -sind(omegaY);
-                   0             1   0;
-                   sind(omegaY)  0   cosd(omegaY)]
-    Rz = @SMatrix [cosd(omegaZ)   sind(omegaZ)  0;
-                  -sind(omegaZ)   cosd(omegaZ)  0;
-                   0              0             1]
+    (sx, cx), (sy, cy), (sz, cz) = sincos(deg2rad(Angle[1])), sincos(deg2rad(Angle[2])), sincos(deg2rad(Angle[3]))
+    Rx = @SMatrix [1   0   0;
+                   0  cx  sx;
+                   0 -sx  cx]
+    Ry = @SMatrix [cy  0 -sy;
+                   0   1   0;
+                   sy  0  cy]
+    Rz = @SMatrix [cz  sz  0;
+                  -sz  cz  0;
+                   0   0   1]
     return Rz * Ry * Rx
 end
 
@@ -1254,7 +1268,7 @@ function inside(p::Point{3, _T}, fec::FiniteEllipsoidalCavity; rotate::Bool=true
     R = fec_rotation(Angle)
 
     # Relative position in EFCS, then rotate to ellipsoid body frame
-    Δ = [p[1] - Center[1], p[2] - Center[2], p[3] - Center[3]]
+    Δ = SVector{3, _T}(p[1] - Center[1], p[2] - Center[2], p[3] - Center[3])
     Δb = rotate ? (R' * Δ) : Δ
 
     return (Δb[1]/ax)^2 + (Δb[2]/ay)^2 + (Δb[3]/az)^2 <= 1

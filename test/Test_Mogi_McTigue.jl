@@ -1,4 +1,4 @@
-using Test
+using Test, InteractiveUtils
 using GeoParams, InjectSills
 
 CharDim = GEO_units(length=1000m, temperature=1000C, stress=10Pa, viscosity=1e20Pas)
@@ -107,3 +107,13 @@ d = hostrock_displacement(mctigue2D, Point2(3500.0, 0.0))
 @test inside(Point2(0.0,   -5000.0), mctigue2D) == true
 @test inside(Point2(1500.0,-5000.0), mctigue2D) == true
 @test inside(Point2(1501.0,-5000.0), mctigue2D) == false
+
+@testset "Float32" begin
+    for S in (MogiSphere, McTigueSphere), N in (2, 3)
+        s64 = S(Center=Point{N}([zeros(N - 1); -5000.0]...)*m)
+        s32 = S(Center=Point{N, Float32}([zeros(N - 1); -5000]...)*m, r=1500f0m, ΔP=1f7Pa, G=1f10Pa, ν=0.25f0*NoUnits)
+        p = [fill(700.0, N - 1); -2000.0]
+        @test hostrock_displacement(s32, Point{N, Float32}(p...)) ≈ hostrock_displacement(s64, Point{N}(p...)) rtol=1e-6
+        @test !occursin("Float64", string(code_typed(hostrock_displacement, (typeof(s32), Point{N, Float32}))))
+    end
+end
