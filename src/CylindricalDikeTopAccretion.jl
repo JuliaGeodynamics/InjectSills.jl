@@ -194,12 +194,10 @@ end
 
 function update_abstractsill(s::CylindricalDikeTopAccretion; kwargs...)
     params = (Center=UnitValue(s.Center), Angle=UnitValue(s.Angle), W=UnitValue(s.W), H=UnitValue(s.H))
-    check_keywords(CylindricalDikeTopAccretion, kwargs, keys(params))
     return CylindricalDikeTopAccretion(; merge(params, kwargs)...)
 end
 
 function update_abstractsill(s::CylindricalDikeTopAccretionFullModelAdvection; kwargs...)
     params = (Center=UnitValue(s.Center), Angle=UnitValue(s.Angle), W=UnitValue(s.W), H=UnitValue(s.H))
-    check_keywords(CylindricalDikeTopAccretionFullModelAdvection, kwargs, keys(params))
     return CylindricalDikeTopAccretionFullModelAdvection(; merge(params, kwargs)...)
 end

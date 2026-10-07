@@ -31,12 +31,12 @@ end
 @testset "penny and plane-strain sills take R, not W" begin
     p = PennyShapedSill(Center=C2, Angle=Vec1(0.0), R=1000.0m, H=10.0m)
     s = PlaneStrainSill(Center=C2, Angle=Vec1(0.0), R=1000.0m, H=10.0m)
-    @test_throws "PennyShapedSill takes the radius `R`" PennyShapedSill(Center=C2, Angle=Vec1(0.0), W=1000.0m, H=10.0m)
-    @test_throws "PennyShapedSill takes the radius `R`" PennyShapedSill(p; W=500.0m)
-    @test_throws "PennyShapedSill takes the radius `R`" update_abstractsill(p; W=500.0m)
-    @test_throws "PlaneStrainSill takes the half-length `R`" PlaneStrainSill(Center=C2, Angle=Vec1(0.0), W=1000.0m, H=10.0m)
-    @test_throws "PlaneStrainSill takes the half-length `R`" PlaneStrainSill(s; W=500.0m)
-    @test_throws "PlaneStrainSill takes the half-length `R`" update_abstractsill(s; W=500.0m)
+    @test_throws MethodError PennyShapedSill(Center=C2, Angle=Vec1(0.0), W=1000.0m, H=10.0m)
+    @test_throws MethodError PennyShapedSill(p; W=500.0m)
+    @test_throws MethodError update_abstractsill(p; W=500.0m)
+    @test_throws MethodError PlaneStrainSill(Center=C2, Angle=Vec1(0.0), W=1000.0m, H=10.0m)
+    @test_throws MethodError PlaneStrainSill(s; W=500.0m)
+    @test_throws MethodError update_abstractsill(s; W=500.0m)
 end
 
 @testset "update_abstractsill keywords" begin
@@ -50,6 +50,6 @@ end
              MogiSphere(Center=C2), McTigueSphere(Center=C2),
              FiniteEllipsoidalCavity(Center=C3, ax=500.0m, ay=500.0m, az=2000.0m))
     for s in sills
-        @test_throws "unknown keyword `Hieght`" update_abstractsill(s; Hieght=1.0m)
+        @test_throws MethodError update_abstractsill(s; Hieght=1.0m)
     end
 end

@@ -157,6 +157,5 @@ end
 
 function update_abstractsill(s::EllipticalIntrusion; kwargs...)
     params = (Center=UnitValue(s.Center), Angle=UnitValue(s.Angle), W=UnitValue(s.W), H=UnitValue(s.H))
-    check_keywords(EllipticalIntrusion, kwargs, keys(params))
     return EllipticalIntrusion(; merge(params, kwargs)...)
 end

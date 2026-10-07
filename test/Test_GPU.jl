@@ -58,7 +58,7 @@ end
         PennyShapedSill(Center=Point3{F}(0, 0, -5000)*m, H=F(400)m, R=F(2000)m, Angle=Vec2{F}(0, 0)*NoUnits, E=F(1.5e10)Pa, ν=F(0.3)*NoUnits)
     D..., phase = init_cell_arrays(particles, Val(N + 1))
     phase.data .= 1
-    @test inject_sill!(particles, D..., xvi, sill; fields=(phase,), values=(F(2),), force_inject=true) === nothing
+    @test inject_sill!(particles, D..., sill; fields=(phase,), values=(F(2),), force_inject=true) === nothing
 
     ok = Array(vec(particles.index.data))
     x  = ntuple(k -> Array(particles.coords[k].data)[ok], N)

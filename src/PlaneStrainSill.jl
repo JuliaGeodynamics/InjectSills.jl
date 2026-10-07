@@ -25,8 +25,9 @@ Parameters:
 - `H::_T = 4*(1-ν^2)*ΔP*R/E` - Maximum opening of sill
 
 The opening at distance `x` from the center is `H√(1 - x²/R²)`, and half of the area `Q`
-crosses every line parallel to the sill on either side. A plane-strain sill has an area per
-unit length, so `area` is `Q` and `volume` throws.
+crosses every line parallel to the sill on either side. `area` is `Q`, the cross-sectional
+area per unit length normal to the model plane. As for the other 2D sills, `volume` is that of
+the 3D body with this cross-section, the spheroid `4π R² (H/2)/3` of the penny-shaped sill.
 
 Reference:
 ===
@@ -66,20 +67,13 @@ set by at most two of `R`, `H`, `ΔP`, `Q`, related by `H = 4(1-ν²) ΔP R/E` a
 Giving three or four of them, or only `R` or only `H`, throws an `ArgumentError`.
 `R`, `H`, `ΔP` and `Q` must be positive, and `ν` must satisfy `-1 < ν ≤ 0.5`.
 """
-function PlaneStrainSill(; R=nothing, Q=nothing, ΔP=nothing, H=nothing, E=1.5e10Pa, ν=0.3*NoUnits, Angle=Vec1(0.0)*NoUnits, Center=Point2(0.0)*m, W=nothing)
-    reject_W(PlaneStrainSill, "half-length", W)
+function PlaneStrainSill(; R=nothing, Q=nothing, ΔP=nothing, H=nothing, E=1.5e10Pa, ν=0.3*NoUnits, Angle=Vec1(0.0)*NoUnits, Center=Point2(0.0)*m)
     length(Center) == 2 ||
         throw(ArgumentError("PlaneStrainSill: `Center` must be 2D; got $(length(Center)) coordinates. A plane-strain sill exists in 2D only; use PennyShapedSill in 3D"))
     length(Angle) == 1 ||
         throw(ArgumentError("PlaneStrainSill: `Angle` must have one component (the dip); got $(length(Angle))"))
     check_poisson_ratio(PlaneStrainSill, ν; incompressible=true)
-    given = [name for (name, x) in ((:R, R), (:H, H), (:ΔP, ΔP), (:Q, Q)) if !isnothing(x)]
-    if length(given) > 2 || given == [:R] || given == [:H]
-        throw(ArgumentError("PlaneStrainSill: got $(join(given, ", ")); specify at most two of R, H, ΔP, Q (any pair), only Q, only ΔP, or none of them"))
-    end
-    for (name, x) in ((:R, R), (:H, H), (:ΔP, ΔP), (:Q, Q))
-        isnothing(x) || check_positive(PlaneStrainSill, name, x)
-    end
+    check_geometry(PlaneStrainSill, R, H, ΔP, Q)
 
     k = 4 * (1 - ν^2) / E     # H = k ΔP R
     if isnothing(R) && isnothing(H)
@@ -128,16 +122,7 @@ Create a new plane-strain sill from an existing one by changing any of `Center`,
 `E`, `ν`, `R`, `H`, `ΔP`, `Q`, as [`update_abstractsill`](@ref) does. Numbers without unit
 for `E`, `ΔP`, `Q`, `R` or `H` take the unit of the value they replace.
 """
-function PlaneStrainSill(s::PlaneStrainSill; kwargs...)
-    kw = Dict{Symbol, Any}(kwargs)
-    for sym in (:E, :ΔP, :Q, :R, :H)
-        unit = oneunit(UnitValue(getfield(s, sym)))
-        if haskey(kw, sym) && kw[sym] isa Number && !(kw[sym] isa typeof(unit))
-            kw[sym] = kw[sym] * unit
-        end
-    end
-    return update_abstractsill(s; kw...)
-end
+PlaneStrainSill(s::PlaneStrainSill; kwargs...) = copy_RHΔPQ(PlaneStrainSill, s; kwargs...)
 
 function show(io::IO, g::PlaneStrainSill)
     label = isdimensional(g) ? "dimensional units" : "nondimensional"
@@ -153,9 +138,8 @@ function show(io::IO, g::PlaneStrainSill)
     return nothing
 end
 
-area(s::PlaneStrainSill) = π * UnitValue(s.R) * (UnitValue(s.H) / 2)
-volume(::PlaneStrainSill) =
-    throw(ArgumentError("volume: a PlaneStrainSill has a cross-sectional area per unit length, not a volume; use `area`"))
+area(s::PlaneStrainSill) = UnitValue(s.Q)
+volume(s::PlaneStrainSill) = 4 / 3 * π * UnitValue(s.R)^2 * (UnitValue(s.H) / 2)
 
 """
     d = hostrock_displacement(sill::PlaneStrainSill{_T}, p::Point{2, _T})
@@ -212,13 +196,4 @@ consistent using these defaults:
 - only `ΔP` → keep `H`, recompute `R` and `Q`
 - only `Q` → keep `H`, recompute `R` and `ΔP`
 """
-function update_abstractsill(s::PlaneStrainSill; kwargs...)
-    reject_W(PlaneStrainSill, "half-length", get(kwargs, :W, nothing))
-    check_keywords(PlaneStrainSill, kwargs, (:Center, :Angle, :E, :ν, :R, :H, :ΔP, :Q))
-    geom = filter(k -> haskey(kwargs, k), (:R, :H, :ΔP, :Q))
-    keep = isempty(geom)      ? (R = UnitValue(s.R), H = UnitValue(s.H)) :
-           geom == (:H,)      ? (R = UnitValue(s.R),) :
-           length(geom) == 1  ? (H = UnitValue(s.H),) : (;)
-    base = (Center = UnitValue(s.Center), Angle = UnitValue(s.Angle), E = UnitValue(s.E), ν = UnitValue(s.ν))
-    return PlaneStrainSill(; merge(base, keep, values(kwargs))...)
-end
+update_abstractsill(s::PlaneStrainSill; kwargs...) = update_RHΔPQ(PlaneStrainSill, s; kwargs...)

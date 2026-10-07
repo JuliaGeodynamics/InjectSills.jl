@@ -242,3 +242,13 @@ end
     end
     @test isempty(untested)
 end
+
+# a sill that contains no point of its bounding box
+struct EmptySill{B} <: AbstractSill{2, Float64}
+    BoundingBox::B
+end
+InjectSills.inside(::Point2, ::EmptySill; rotate::Bool=true) = false
+
+@testset "new_point_inside_sill – no point found" begin
+    @test_throws "no point inside EmptySill after 1000 tries" new_point_inside_sill(EmptySill(PennyShapedSill().BoundingBox))
+end

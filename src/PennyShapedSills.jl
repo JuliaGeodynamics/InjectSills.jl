@@ -46,14 +46,13 @@ struct PennyShapedSill{N, _T, N1, N2, U1, U2, U3, U4, U5} <: AbstractSill{N,_T}
     Lengthscale::GeoUnit{_T,U1}
     BoundingBox::NTuple{2, GeoUnit{Point{N, _T}, U1}}
     RotMat::GeoUnit{SMatrix{N,N,_T,N2},U4}             # rotation matrix (precomputed for efficiency)
-    RotMat_negative::GeoUnit{SMatrix{N,N,_T,N2},U4}    # with negative angle
 end
 Adapt.@adapt_structure PennyShapedSill
 
 isdimensional(s::PennyShapedSill) = isdimensional(s.E)
 
 """
-    PennyShapedSill(; R=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e10Pa, ν=0.3*NoUnits, Angle=Vec1(0.0)*Pas, Center=Point2(0.0)*m)
+    PennyShapedSill(; R=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e10Pa, ν=0.3*NoUnits, Angle=Vec1(0.0)*NoUnits, Center=Point2(0.0)*m)
 
 Defines parameters for a penny shaped sill in a homogeneous elastic medium.
 The geometry is set by at most two of `R`, `H`, `ΔP`, `Q`:
@@ -65,17 +64,10 @@ Giving three or four of them, or only `R` or only `H`, throws an `ArgumentError`
 `R`, `H`, `ΔP` and `Q` must be positive, and `ν` must satisfy `-1 < ν < 0.5`
 (the solution of Sun (1969) contains `1/(1-2ν)`).
 """
-function PennyShapedSill(; R=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e10Pa, ν=0.3*NoUnits, Angle=Vec1(0.0)*Pas, Center=Point2(0.0)*m, W=nothing)
-    reject_W(PennyShapedSill, "radius", W)
+function PennyShapedSill(; R=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e10Pa, ν=0.3*NoUnits, Angle=Vec1(0.0)*NoUnits, Center=Point2(0.0)*m)
     @assert length(Center)==length(Angle)+1
     check_poisson_ratio(PennyShapedSill, ν; incompressible=false)
-    given = [name for (name, x) in ((:R, R), (:H, H), (:ΔP, ΔP), (:Q, Q)) if !isnothing(x)]
-    if length(given) > 2 || given == [:R] || given == [:H]
-        throw(ArgumentError("PennyShapedSill: got $(join(given, ", ")); specify at most two of R, H, ΔP, Q (any pair), only Q, only ΔP, or none of them"))
-    end
-    for (name, x) in ((:R, R), (:H, H), (:ΔP, ΔP), (:Q, Q))
-        isnothing(x) || check_positive(PennyShapedSill, name, x)
-    end
+    check_geometry(PennyShapedSill, R, H, ΔP, Q)
 
     if isnothing(R) && isnothing(Q) && isnothing(ΔP) && isnothing(H)
         ΔP  =  1e6*Pa
@@ -124,7 +116,6 @@ function PennyShapedSill(; R=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e
 
     # Compute rotation matrix - as this is a relatively expensive operation, we precompute & store it in the struct
     RotMat = RotationMatrix(ustrip.(Angle))
-    RotMat_negative = RotMat'
 
     Cg = convert(GeoUnit, Center)
     Rg = convert(GeoUnit, R)
@@ -148,7 +139,6 @@ function PennyShapedSill(; R=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e
         Lengthscale,
         BoundingBox,
         convert(GeoUnit, RotMat),
-        convert(GeoUnit, RotMat_negative),
     )
 end
 
@@ -156,81 +146,11 @@ end
 """
     PennyShapedSill(s::PennyShapedSill; kwargs...)
 
-Create a new penny-shaped sill from an existing one by changing any number of
-parameters.
-
-For updates of `R`, `H`, `ΔP`, or `Q`, a valid constructor combination is
-selected automatically.
+Create a new penny-shaped sill from an existing one by changing any of `Center`, `Angle`,
+`E`, `ν`, `R`, `H`, `ΔP`, `Q`, as [`update_abstractsill`](@ref) does. Numbers without unit
+for `E`, `ΔP`, `Q`, `R` or `H` take the unit of the value they replace.
 """
-function PennyShapedSill(s::PennyShapedSill; kwargs...)
-    reject_W(PennyShapedSill, "radius", get(kwargs, :W, nothing))
-    valid = (:Center, :Angle, :E, :ν, :R, :H, :ΔP, :Q)
-    all(k -> k in valid, keys(kwargs)) ||
-        error("Invalid keyword for PennyShapedSill(s; ...). Valid keys are: $(valid)")
-
-    base = (
-        Center = UnitValue(s.Center),
-        Angle  = UnitValue(s.Angle),
-        E      = UnitValue(s.E),
-        ν      = UnitValue(s.ν),
-        R      = UnitValue(s.R),
-        H      = UnitValue(s.H),
-        ΔP     = UnitValue(s.ΔP),
-        Q      = UnitValue(s.Q),
-    )
-
-    kw = Dict{Symbol,Any}(kwargs)
-    for sym in (:E, :ΔP, :Q, :R, :H)
-        if haskey(kw, sym) && kw[sym] isa Number && !(kw[sym] isa typeof(oneunit(getproperty(base, sym))))
-            kw[sym] = kw[sym] * oneunit(getproperty(base, sym))
-        end
-    end
-
-    updated = merge(base, (; kw...))
-    gkeys = Set{Symbol}(k for k in keys(kwargs) if k in (:R, :H, :ΔP, :Q))
-
-    # Select the correct constructor branch for physically consistent updates.
-    R  = nothing
-    H  = nothing
-    ΔP = nothing
-    Q  = nothing
-
-    if isempty(gkeys)
-        R = updated.R
-        H = updated.H
-    elseif gkeys == Set([:R])
-        R = updated.R
-        H = updated.H
-    elseif gkeys == Set([:H])
-        R = updated.R
-        H = updated.H
-    elseif gkeys == Set([:ΔP])
-        H = updated.H
-        ΔP = updated.ΔP
-    elseif gkeys == Set([:Q])
-        H = updated.H
-        Q = updated.Q
-    elseif gkeys == Set([:R, :H])
-        R = updated.R
-        H = updated.H
-    elseif gkeys == Set([:R, :Q])
-        R = updated.R
-        Q = updated.Q
-    elseif gkeys == Set([:R, :ΔP])
-        R = updated.R
-        ΔP = updated.ΔP
-    elseif gkeys == Set([:H, :Q])
-        H = updated.H
-        Q = updated.Q
-    elseif gkeys == Set([:H, :ΔP])
-        H = updated.H
-        ΔP = updated.ΔP
-    else
-        error("Invalid R/H/ΔP/Q combination. Use one of: R, H, ΔP, Q, R+H, R+Q, R+ΔP, H+Q, H+ΔP")
-    end
-
-    return PennyShapedSill(; Center=updated.Center, Angle=updated.Angle, E=updated.E, ν=updated.ν, R, H, ΔP, Q)
-end
+PennyShapedSill(s::PennyShapedSill; kwargs...) = copy_RHΔPQ(PennyShapedSill, s; kwargs...)
 
 # Print info in the REPL
 function show(io::IO, g::PennyShapedSill)
@@ -297,33 +217,6 @@ function hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T}) whe
 
 
     return Displacement_r
-end
-
-
-function compute_penny_shaped_displacement(r, z, ΔP, ν, E, R)
-    # Attempt to mimic the complex implementation of Sun (below) using real numbers
-    error("This does not work correctly, use the complex implementation")
-    # WRONG!!!
-    R1 = sqrt(r^2 + (z - R)^2)
-    R2 = sqrt(r^2 + (z + R)^2)
-
-    # equation 7a:
-    term1 = r * log((R2 + z + R) / (R1 + z - R))
-    term2 = r / 2 * ((R - 3z - R2) / (R2 + z + R) + (R1 + 3z + R) / (R1 + z - R))
-    term3 = (2 * z^2 * r) / (1 - 2ν) * (1 / (R2 * (R2 + z + R)) - 1 / (R1 * (R1 + z - R)))
-    term4 = (2 * z * r) / (1 - 2ν) * (1 / R2 - 1 / R1)
-    dU = ΔP * (1 + ν) * (1 - 2ν) / (2π * E) * (term1 - term2 - term3 + term4)
-
-    # equation 7b:
-    term5 = z * log((R2 + z + R) / (R1 + z - R))
-    term6 = R2 - R1
-    term7 = 1 / (2 * (1 - ν)) * (z * log((R2 + z + R) / (R1 + z - R)) - R * z * (1 / R2 + 1 / R1))
-    dW = 2 * ΔP * (1 - ν^2) / (π * E) * (term5 - term6 - term7)
-
-    Uz = dW  # vertical displacement should be corrected for z<0
-    Ur = dU
-
-    return Ur, Uz
 end
 
 
@@ -421,40 +314,4 @@ p3 = update_abstractsill(p, R = 3000.0m, H = 200.0m)
 p4 = update_abstractsill(p, ΔP = 2e6Pa)
 ```
 """
-function update_abstractsill(s::PennyShapedSill; kwargs...)
-    reject_W(PennyShapedSill, "radius", get(kwargs, :W, nothing))
-    check_keywords(PennyShapedSill, kwargs, (:Center, :Angle, :E, :ν, :R, :H, :ΔP, :Q))
-    kw = Dict{Symbol,Any}(kwargs)
-
-    has_R  = haskey(kw, :R)
-    has_H  = haskey(kw, :H)
-    has_ΔP = haskey(kw, :ΔP)
-    has_Q  = haskey(kw, :Q)
-
-    R  = get(kw, :R,  nothing)
-    H  = get(kw, :H,  nothing)
-    ΔP = get(kw, :ΔP, nothing)
-    Q  = get(kw, :Q,  nothing)
-
-    # Ensure a valid parameter pair reaches the constructor.
-    if !has_R && !has_H && !has_ΔP && !has_Q
-        R = UnitValue(s.R);  H = UnitValue(s.H)   # nothing changed: keep R+H
-    elseif has_R && !has_H && !has_ΔP && !has_Q
-        H = UnitValue(s.H)                          # only R: R+H branch
-    elseif has_H && !has_R && !has_ΔP && !has_Q
-        R = UnitValue(s.R)                          # only H: R+H branch
-    elseif has_ΔP && !has_R && !has_H && !has_Q
-        H = UnitValue(s.H)                          # only ΔP: H+ΔP branch
-    elseif has_Q && !has_R && !has_H && !has_ΔP
-        H = UnitValue(s.H)                          # only Q: H+Q branch
-    # Otherwise user supplied a complete valid pair; pass as-is.
-    end
-
-    return PennyShapedSill(;
-        Center = get(kw, :Center, UnitValue(s.Center)),
-        Angle  = get(kw, :Angle,  UnitValue(s.Angle)),
-        E      = get(kw, :E,      UnitValue(s.E)),
-        ν      = get(kw, :ν,      UnitValue(s.ν)),
-        R, H, ΔP, Q,
-    )
-end
+update_abstractsill(s::PennyShapedSill; kwargs...) = update_RHΔPQ(PennyShapedSill, s; kwargs...)

@@ -1299,6 +1299,5 @@ function update_abstractsill(s::FiniteEllipsoidalCavity; kwargs...)
         Nmax   = s.Nmax,
         Cr     = s.Cr,
     )
-    check_keywords(FiniteEllipsoidalCavity, kwargs, keys(params))
     return FiniteEllipsoidalCavity(; merge(params, kwargs)...)
 end

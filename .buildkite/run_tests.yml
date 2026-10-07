@@ -1,15 +1,10 @@
 steps:
-  - label: "CUDA Julia {{matrix.version}}"
+  - label: "CUDA Julia 1"
     key: "tests-cuda"
     if: build.message !~ /\[skip tests\]/
-    matrix:
-      setup:
-        version:
-          - "1.10"
-          - "1"
     plugins:
       - JuliaCI/julia#v1:
-          version: "{{matrix.version}}"
+          version: "1"
       - JuliaCI/julia-coverage#v1:
           codecov: true
           dirs:
@@ -31,17 +26,12 @@ steps:
     env:
       JULIA_NUM_THREADS: 4
 
-  - label: "AMDGPU Julia {{matrix.version}}"
+  - label: "AMDGPU Julia 1"
     key: "tests-amdgpu"
     if: build.message !~ /\[skip tests\]/
-    matrix:
-      setup:
-        version:
-          - "1.10"
-          - "1"
     plugins:
       - JuliaCI/julia#v1:
-          version: "{{matrix.version}}"
+          version: "1"
       - JuliaCI/julia-coverage#v1:
           codecov: true
           dirs:
@@ -64,17 +54,12 @@ steps:
     env:
       JULIA_NUM_THREADS: 4
 
-  - label: "Metal Julia {{matrix.version}}"
+  - label: "Metal Julia 1"
     key: "tests-metal"
     if: build.message !~ /\[skip tests\]/
-    matrix:
-      setup:
-        version:
-          - "1.10"
-          - "1"
     plugins:
       - JuliaCI/julia#v1:
-          version: "{{matrix.version}}"
+          version: "1"
       - JuliaCI/julia-coverage#v1:
           codecov: true
           dirs:

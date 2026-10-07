@@ -140,6 +140,5 @@ function update_abstractsill(s::SquareDikeTopAccretion; kwargs...)
         W      = UnitValue(s.W),
         H      = UnitValue(s.H),
     )
-    check_keywords(SquareDikeTopAccretion, kwargs, keys(params))
     return SquareDikeTopAccretion(; merge(params, kwargs)...)
 end

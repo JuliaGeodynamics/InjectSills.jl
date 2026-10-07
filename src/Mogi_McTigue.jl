@@ -324,7 +324,6 @@ function update_abstractsill(s::MogiSphere; kwargs...)
         G      = UnitValue(s.G),
         ν      = UnitValue(s.ν),
     )
-    check_keywords(MogiSphere, kwargs, keys(params))
     return MogiSphere(; merge(params, kwargs)...)
 end
 
@@ -336,6 +335,5 @@ function update_abstractsill(s::McTigueSphere; kwargs...)
         G      = UnitValue(s.G),
         ν      = UnitValue(s.ν),
     )
-    check_keywords(McTigueSphere, kwargs, keys(params))
     return McTigueSphere(; merge(params, kwargs)...)
 end

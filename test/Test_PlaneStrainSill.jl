@@ -20,7 +20,7 @@ a, ν, E, ΔP = 2000.0, 0.25, 1.5e10, 3e6
     @test H ≈ 4 * (1 - ν^2) * ΔP * a / E * m
     @test UnitValue(s.Q) ≈ π * a * m * H / 2
     @test InjectSills.area(s) ≈ UnitValue(s.Q)
-    @test_throws "not a volume" InjectSills.volume(s)
+    @test InjectSills.volume(s) ≈ InjectSills.volume(PennyShapedSill(R=a*m, H=H))
     # every pair gives the same sill
     for kw in ((R=a*m, H=H), (R=a*m, Q=s.Q.val*m^2), (H=H, Q=s.Q.val*m^2), (H=H, ΔP=ΔP*Pa), (Q=s.Q.val*m^2, ΔP=ΔP*Pa))
         t = PlaneStrainSill(; Center=Point2(0.0, -5000.0)*m, E=E*Pa, ν=ν*NoUnits, kw...)
@@ -28,6 +28,7 @@ a, ν, E, ΔP = 2000.0, 0.25, 1.5e10, 3e6
     end
     @test UnitValue(PlaneStrainSill().Q) ≈ 1000.0m^2
     @test UnitValue(PlaneStrainSill().ΔP) ≈ 1e6Pa
+    @test UnitValue(PlaneStrainSill(ΔP=2e6Pa).R) ≈ UnitValue(PlaneStrainSill().R)
     @test UnitValue(update_abstractsill(s, R=1000.0m).H) == H
     @test UnitValue(PlaneStrainSill(s, ΔP=6e6).R) ≈ a / 2 * m
     @test isbitstype(typeof(s))
@@ -37,7 +38,7 @@ a, ν, E, ΔP = 2000.0, 0.25, 1.5e10, 3e6
     @test_throws "`Center` must be 2D" PlaneStrainSill(Center=Point3(0.0, 0.0, 0.0)*m, R=a*m, H=1.0m)
     @test_throws "specify at most two of R, H, ΔP, Q" PlaneStrainSill(R=a*m, H=1.0m, ΔP=ΔP*Pa)
     @test_throws "`H` must be positive" PlaneStrainSill(R=a*m, H=-1.0m)
-    @test_throws "unknown keyword `Hieght`" update_abstractsill(s; Hieght=1.0m)
+    @test_throws MethodError update_abstractsill(s; Hieght=1.0m)
 end
 
 @testset "displacement" begin

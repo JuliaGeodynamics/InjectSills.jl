@@ -178,6 +178,5 @@ function update_abstractsill(s::SquareDike; kwargs...)
         W      = UnitValue(s.W),
         H      = UnitValue(s.H),
     )
-    check_keywords(SquareDike, kwargs, keys(params))
     return SquareDike(; merge(params, kwargs)...)
 end

@@ -6,14 +6,14 @@ using JustPIC
 using KernelAbstractions, Adapt
 
 """
-    inject_sill!(particles, Dx, Dy, xvi, sill::AbstractSill{2}; fields=(), values=(), force_inject=false)
-    inject_sill!(particles, Dx, Dy, Dz, xvi, sill::AbstractSill{3}; fields=(), values=(), force_inject=false)
+    inject_sill!(particles, Dx, Dy, sill::AbstractSill{2}; fields=(), values=(), force_inject=false)
+    inject_sill!(particles, Dx, Dy, Dz, sill::AbstractSill{3}; fields=(), values=(), force_inject=false)
 
 Displace JustPIC `particles` by the host-rock displacement of `sill` and move them to
 their new cells. `Dx`, `Dy` (, `Dz`) are `CellArray`s from `init_cell_arrays`; they
 return the displacement of each particle. `fields` are further particle `CellArray`s
-(e.g. phase, temperature) that move with the particles. `xvi` is not used; the grid
-is taken from `particles`. The displacements are computed with `hostrock_displacement!`.
+(e.g. phase, temperature) that move with the particles. The grid is taken from
+`particles`. The displacements are computed with `hostrock_displacement!`.
 
 With `force_inject=true`, the sill is then filled with new particles at the initial
 density `particles.nxcell` per cell, and each of `fields` is set to the matching entry
@@ -22,14 +22,16 @@ of `values` on them.
 All work runs on the backend of `particles` (CPU or GPU). On a GPU, the sill's float type
 must be supported by the device, e.g. `Float32` on Metal.
 """
-InjectSills.inject_sill!(particles, Dx, Dy, xvi, sill::AbstractSill{2}; kwargs...) =
-    _inject_sill!(particles, (Dx, Dy), xvi, sill; kwargs...)
+InjectSills.inject_sill!(particles, Dx, Dy, sill::AbstractSill{2}; kwargs...) =
+    _inject_sill!(particles, (Dx, Dy), sill; kwargs...)
 
-InjectSills.inject_sill!(particles, Dx, Dy, Dz, xvi, sill::AbstractSill{3}; kwargs...) =
-    _inject_sill!(particles, (Dx, Dy, Dz), xvi, sill; kwargs...)
+InjectSills.inject_sill!(particles, Dx, Dy, Dz, sill::AbstractSill{3}; kwargs...) =
+    _inject_sill!(particles, (Dx, Dy, Dz), sill; kwargs...)
 
-function _inject_sill!(particles, D::NTuple{N}, xvi, sill::AbstractSill{N, _T};
+function _inject_sill!(particles, D::NTuple{N}, sill::AbstractSill{N, _T};
                        fields=(), values=(), force_inject=false) where {N, _T}
+    force_inject && length(fields) != length(values) &&
+        throw(ArgumentError("inject_sill!: fields and values must have the same length"))
     coords = map(c -> c.data, particles.coords)
     # empty particle slots have NaN coordinates
     hostrock_displacement!(map(d -> d.data, D), sill, coords; skipnan=true)
@@ -40,7 +42,6 @@ function _inject_sill!(particles, D::NTuple{N}, xvi, sill::AbstractSill{N, _T};
     move_particles!(particles, (D..., fields...))
 
     if force_inject
-        length(fields) == length(values) || throw(ArgumentError("fields and values must have the same length"))
         # new particles were not displaced: D = 0 on them
         force_injection!(particles, sill_particles(particles, sill), (fields..., D...), (values..., ntuple(_ -> zero(_T), N)...))
     end
@@ -66,30 +67,30 @@ function sill_particles(particles, sill::AbstractSill{N, _T}) where {N, _T}
     isempty(cells) && return p_new
 
     # candidate positions within each cell, as fractions of the cell size
-    R = adapt(backend, rand(_T, N, nxcell, size(cells)...))
+    U = adapt(backend, rand(_T, N, nxcell, size(cells)...))
     offset = first(cells) - oneunit(first(cells))
     dropped = KernelAbstractions.zeros(backend, Int, size(cells)...)
-    sill_particles_kernel!(backend)(p_new, dropped, index, xvi, R, adapt(backend, sill), offset; ndrange = size(cells))
+    sill_particles_kernel!(backend)(p_new, dropped, index, xvi, U, adapt(backend, sill), offset; ndrange = size(cells))
     synchronize(backend)
     n = sum(dropped)
     n == 0 || error("inject_sill!: $n new sill particles found no free slot in their cell; increase the particles' `max_xcell`")
     return p_new
 end
 
-@kernel function sill_particles_kernel!(p_new, dropped, index, xvi, R, sill, offset)
+@kernel function sill_particles_kernel!(p_new, dropped, index, xvi, U, sill, offset)
     J = @index(Global, Cartesian)
-    dropped[J] = fill_cell!(p_new, index, xvi, R, sill, J, offset)
+    dropped[J] = fill_cell!(p_new, index, xvi, U, sill, J, offset)
 end
 
 # Returns the number of candidates inside the sill that found no free slot.
-function fill_cell!(p_new, index, xvi, R, sill::AbstractSill{N, _T}, J, offset) where {N, _T}
+function fill_cell!(p_new, index, xvi, U, sill::AbstractSill{N, _T}, J, offset) where {N, _T}
     I  = Tuple(J + offset)
     lo = Point{N, _T}(ntuple(k -> xvi[k][I[k]], Val(N)))
     hi = Point{N, _T}(ntuple(k -> xvi[k][I[k] + 1], Val(N)))
     ip = 0
     dropped = 0
-    for c in axes(R, 2)
-        p = Point{N, _T}(ntuple(k -> lo[k] + R[k, c, Tuple(J)...] * (hi[k] - lo[k]), Val(N)))
+    for c in axes(U, 2)
+        p = Point{N, _T}(ntuple(k -> lo[k] + U[k, c, Tuple(J)...] * (hi[k] - lo[k]), Val(N)))
         inside(p, sill) || continue
         # next free slot (JustPIC.doskip is true for an empty slot)
         ip += 1

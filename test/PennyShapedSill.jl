@@ -221,3 +221,14 @@ p=Point3(0,0.0,0)
 using Plots
 heatmap(x/1e3,z/1e3,Ux)
 =#
+
+# every pair of R, H, ΔP, Q gives the same sill
+sillP = PennyShapedSill(R = 1000.0m, ΔP = 3e6Pa)
+Rp, Hp, ΔPp, Qp = UnitValue(sillP.R), UnitValue(sillP.H), UnitValue(sillP.ΔP), UnitValue(sillP.Q)
+for kw in ((R = Rp, H = Hp), (R = Rp, Q = Qp), (H = Hp, Q = Qp), (H = Hp, ΔP = ΔPp), (Q = Qp, ΔP = ΔPp))
+    t = PennyShapedSill(; kw...)
+    @test all(f -> getfield(t, f).val ≈ getfield(sillP, f).val, (:R, :H, :ΔP, :Q))
+end
+sillQ = PennyShapedSill(Q = Qp)
+@test UnitValue(sillQ.Q) ≈ Qp
+@test UnitValue(sillQ.ΔP) ≈ 1e6Pa

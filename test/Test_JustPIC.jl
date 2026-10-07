@@ -17,7 +17,7 @@ advected(sill, x, D) = hostrock_displacement(sill, Point(x .- D)) ≈ Vec(D)
     sill = PennyShapedSill(Center=Point2(0, -5000)*m, H=40.0m, R=2000.0m, Angle=Vec1(30))
     Dx, Dy, phase = init_cell_arrays(particles, Val(3))
     phase.data .= 1.0
-    @test inject_sill!(particles, Dx, Dy, xvi, sill; fields=(phase,), values=(2.0,), force_inject=true) === nothing
+    @test inject_sill!(particles, Dx, Dy, sill; fields=(phase,), values=(2.0,), force_inject=true) === nothing
 
     ok = vec(particles.index.data)
     px, py, ph = particles.coords[1].data[ok], particles.coords[2].data[ok], phase.data[ok]
@@ -26,12 +26,12 @@ advected(sill, x, D) = hostrock_displacement(sill, Point(x .- D)) ≈ Vec(D)
     @test any(i -> !iszero(dy[i]), host)
     @test all(i -> advected(sill, (px[i], py[i]), (dx[i], dy[i])), host)
     @test !isempty(magma) && all(i -> inside(Point2(px[i], py[i]), sill), magma)
-    @test_throws "fields and values" inject_sill!(particles, Dx, Dy, xvi, sill; fields=(phase,), force_inject=true)
+    @test_throws "fields and values" inject_sill!(particles, Dx, Dy, sill; fields=(phase,), force_inject=true)
 
     # cells without free slots cannot take the new sill particles
     full = init_particles(JustPIC.CPU, 12, 12, 6, staggered(xvi...)...)
     Dx, Dy = init_cell_arrays(full, Val(2))
-    @test_throws "no free slot" inject_sill!(full, Dx, Dy, xvi, sill; force_inject=true)
+    @test_throws "no free slot" inject_sill!(full, Dx, Dy, sill; force_inject=true)
 end
 
 @testset "3D" begin
@@ -40,7 +40,7 @@ end
     particles = init_particles(JustPIC.CPU, 6, 18, 3, staggered(xvi...)...)
     sill = PennyShapedSill(Center=Point3(0, 0, -5000)*m, H=400.0m, R=2000.0m, Angle=Vec2(0, 0))
     Dx, Dy, Dz = init_cell_arrays(particles, Val(3))
-    @test inject_sill!(particles, Dx, Dy, Dz, xvi, sill; force_inject=true) === nothing
+    @test inject_sill!(particles, Dx, Dy, Dz, sill; force_inject=true) === nothing
     ok = vec(particles.index.data)
     @test any(ok)
     @test all(isfinite, Dz.data[ok])

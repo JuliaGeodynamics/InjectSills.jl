@@ -150,11 +150,7 @@ function unrotated_bounding_box(center::GeoUnit{Point{3, _T}, U}, hx::_T, hy::_T
 end
 
 
-# Create a named tuple from a struct, which is useful for some of the dispatches in the sill constructor
-to_nt(s) = NamedTuple{fieldnames(typeof(s))}(Tuple(getfield(s, f) for f in fieldnames(typeof(s))))
-
-
-# Argument validation shared by the sill constructors and `update_abstractsill`.
+# Argument validation shared by the sill constructors.
 # Values may be plain numbers, Unitful quantities, or `GeoUnit`s.
 plain_value(x) = x isa GeoUnit ? UnitValue(x) : x
 
@@ -173,15 +169,39 @@ function check_poisson_ratio(T, ν; incompressible::Bool)
     return nothing
 end
 
-function check_keywords(T, kwargs, valid)
-    for k in keys(kwargs)
-        k in valid || throw(ArgumentError("$T: unknown keyword `$k`; valid keywords are $(join(valid, ", "))"))
+# `PennyShapedSill` and `PlaneStrainSill`: the geometry is set by at most two of R, H, ΔP, Q.
+function check_geometry(T, R, H, ΔP, Q)
+    given = [name for (name, x) in ((:R, R), (:H, H), (:ΔP, ΔP), (:Q, Q)) if !isnothing(x)]
+    if length(given) > 2 || given == [:R] || given == [:H]
+        throw(ArgumentError("$T: got $(join(given, ", ")); specify at most two of R, H, ΔP, Q (any pair), only Q, only ΔP, or none of them"))
+    end
+    for (name, x) in ((:R, R), (:H, H), (:ΔP, ΔP), (:Q, Q))
+        isnothing(x) || check_positive(T, name, x)
     end
     return nothing
 end
 
-# `W` is the full width of the other sill types; `T` is sized by its radius or half-length `R`.
-function reject_W(T, what, W)
-    isnothing(W) || throw(ArgumentError("$T takes the $what `R`, not `W`"))
-    return nothing
+# `update_abstractsill` for the constructor `S` of `PennyShapedSill` or `PlaneStrainSill`.
+# R, H, ΔP, Q are tied by two relations: when only one of them changes, H is kept (R when
+# H itself changes); two of them are passed on as given.
+function update_RHΔPQ(S, s; kwargs...)
+    geom = filter(k -> haskey(kwargs, k), (:R, :H, :ΔP, :Q))
+    keep = isempty(geom)     ? (R = UnitValue(s.R), H = UnitValue(s.H)) :
+           geom == (:H,)     ? (R = UnitValue(s.R),) :
+           length(geom) == 1 ? (H = UnitValue(s.H),) : (;)
+    base = (Center = UnitValue(s.Center), Angle = UnitValue(s.Angle), E = UnitValue(s.E), ν = UnitValue(s.ν))
+    return S(; merge(base, keep, values(kwargs))...)
+end
+
+# Copy constructor `S(s; kwargs...)`: numbers without unit for E, ΔP, Q, R, H take the unit
+# of the value they replace.
+function copy_RHΔPQ(S, s; kwargs...)
+    kw = Dict{Symbol, Any}(kwargs)
+    for sym in (:E, :ΔP, :Q, :R, :H)
+        unit = oneunit(UnitValue(getfield(s, sym)))
+        if haskey(kw, sym) && kw[sym] isa Number && !(kw[sym] isa typeof(unit))
+            kw[sym] = kw[sym] * unit
+        end
+    end
+    return update_RHΔPQ(S, s; kw...)
 end

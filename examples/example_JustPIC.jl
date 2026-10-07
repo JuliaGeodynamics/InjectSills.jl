@@ -19,7 +19,6 @@ function main()
     Lx = Ly = 10000.0
     xv = range(-Lx/2, Lx/2, length=n)
     yv = range(-Ly, 0, length=n)
-    xvi = (xv, yv)
 
     # Staggered velocity grids: vertex vector on the diagonal, extended cell centers off it.
     xc  = xv[1:end-1] .+ step(xv) / 2
@@ -34,7 +33,7 @@ function main()
     phase.data .= HOST
     x0, y0, _ = active(particles, phase)
 
-    inject_sill!(particles, Dx, Dy, xvi, sill; fields=(phase,), values=(MAGMA,), force_inject=true)
+    inject_sill!(particles, Dx, Dy, sill; fields=(phase,), values=(MAGMA,), force_inject=true)
 
     x1, y1, ph, ux, uy = active(particles, phase, Dx, Dy)
     host, magma = ph .== HOST, ph .== MAGMA
