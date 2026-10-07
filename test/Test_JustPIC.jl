@@ -27,12 +27,17 @@ advected(sill, x, D) = hostrock_displacement(sill, Point(x .- D)) ≈ Vec(D)
     @test all(i -> advected(sill, (px[i], py[i]), (dx[i], dy[i])), host)
     @test !isempty(magma) && all(i -> inside(Point2(px[i], py[i]), sill), magma)
     @test_throws "fields and values" inject_sill!(particles, Dx, Dy, xvi, sill; fields=(phase,), force_inject=true)
+
+    # cells without free slots cannot take the new sill particles
+    full = init_particles(JustPIC.CPU, 12, 12, 6, staggered(xvi...)...)
+    Dx, Dy = init_cell_arrays(full, Val(2))
+    @test_throws "no free slot" inject_sill!(full, Dx, Dy, xvi, sill; force_inject=true)
 end
 
 @testset "3D" begin
     xvi = (range(-5000.0, 5000.0, length=17), range(-5000.0, 5000.0, length=17),
            range(-10000.0, 0.0, length=17))
-    particles = init_particles(JustPIC.CPU, 6, 8, 3, staggered(xvi...)...)
+    particles = init_particles(JustPIC.CPU, 6, 18, 3, staggered(xvi...)...)
     sill = PennyShapedSill(Center=Point3(0, 0, -5000)*m, H=400.0m, W=2000.0m, Angle=Vec2(0, 0))
     Dx, Dy, Dz = init_cell_arrays(particles, Val(3))
     @test inject_sill!(particles, Dx, Dy, Dz, xvi, sill; force_inject=true) === nothing

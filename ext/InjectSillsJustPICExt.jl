@@ -73,21 +73,26 @@ function sill_particles(particles, sill::AbstractSill{N, _T}) where {N, _T}
     # candidate positions within each cell, as fractions of the cell size
     R = adapt(backend, rand(_T, N, nxcell, size(cells)...))
     offset = first(cells) - oneunit(first(cells))
-    sill_particles_kernel!(backend)(p_new, index, xvi, R, adapt(backend, sill), offset; ndrange = size(cells))
+    dropped = KernelAbstractions.zeros(backend, Int, size(cells)...)
+    sill_particles_kernel!(backend)(p_new, dropped, index, xvi, R, adapt(backend, sill), offset; ndrange = size(cells))
     synchronize(backend)
+    n = sum(dropped)
+    n == 0 || error("inject_sill!: $n new sill particles found no free slot in their cell; increase the particles' `max_xcell`")
     return p_new
 end
 
-@kernel function sill_particles_kernel!(p_new, index, xvi, R, sill, offset)
+@kernel function sill_particles_kernel!(p_new, dropped, index, xvi, R, sill, offset)
     J = @index(Global, Cartesian)
-    fill_cell!(p_new, index, xvi, R, sill, J, offset)
+    dropped[J] = fill_cell!(p_new, index, xvi, R, sill, J, offset)
 end
 
+# Returns the number of candidates inside the sill that found no free slot.
 function fill_cell!(p_new, index, xvi, R, sill::AbstractSill{N, _T}, J, offset) where {N, _T}
     I  = Tuple(J + offset)
     lo = Point{N, _T}(ntuple(k -> xvi[k][I[k]], Val(N)))
     hi = Point{N, _T}(ntuple(k -> xvi[k][I[k] + 1], Val(N)))
     ip = 0
+    dropped = 0
     for c in axes(R, 2)
         p = Point{N, _T}(ntuple(k -> lo[k] + R[k, c, Tuple(J)...] * (hi[k] - lo[k]), Val(N)))
         inside(p, sill) || continue
@@ -96,10 +101,13 @@ function fill_cell!(p_new, index, xvi, R, sill::AbstractSill{N, _T}, J, offset) 
         while ip <= cellnum(index) && !JustPIC.doskip(index, ip, I...)
             ip += 1
         end
-        ip > cellnum(index) && break
-        p_new[I..., ip] = p
+        if ip > cellnum(index)
+            dropped += 1
+        else
+            p_new[I..., ip] = p
+        end
     end
-    return nothing
+    return dropped
 end
 
 # World-frame axis-aligned box enclosing the (rotated) sill.
