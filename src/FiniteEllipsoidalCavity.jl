@@ -129,9 +129,27 @@ ue, un, uv, dV, DV, Ns = fECM(X, Y, X0, Y0, depth, omegaX, omegaY, omegaZ,
 ```
 """
 function fECM(X, Y, X0, Y0, depth, omegaX, omegaY, omegaZ,
-              ax, ay, az, p, mu, lambda, DepthRef; 
+              ax, ay, az, p, mu, lambda, DepthRef;
               Nmax=5e3, Cr=14)
-    
+    src = fecm_sources(X0, Y0, depth, omegaX, omegaY, omegaZ, ax, ay, az, p, mu, lambda, DepthRef; Nmax, Cr)
+    return fecm_eval(X, Y, src)
+end
+
+"""
+    src = fecm_sources(X0, Y0, depth, omegaX, omegaY, omegaZ, ax, ay, az, p, mu, lambda, DepthRef; Nmax=5e3, Cr=14)
+
+Point compound dislocation sources that represent the cavity in `fECM`; the arguments are
+those of `fECM`. Returns a `NamedTuple` with the source coordinates `x0`, `y0`, depths `d`,
+the potencies `DV` of the three point tensile dislocations of every source, the sines and
+cosines `ptd` of their orientations, Poisson's ratio `nu`, and `dV`, `DVtot`, `Ns` as
+returned by `fECM`.
+"""
+function fecm_sources(X0, Y0, depth, omegaX, omegaY, omegaZ,
+                      ax, ay, az, p, mu, lambda, DepthRef;
+                      Nmax=5e3, Cr=14)
+    # The grid is built in Float64; the returned sources use the float type of the geometry.
+    T = float(promote_type(typeof(X0), typeof(Y0), typeof(depth), typeof(ax), typeof(ay), typeof(az)))
+
     # Get top and bottom of ellipsoid
     Zt, Zb = EllTopBot(depth, omegaX, omegaY, omegaZ, ax, ay, az)
     
@@ -149,10 +167,6 @@ function fECM(X, Y, X0, Y0, depth, omegaX, omegaY, omegaZ,
     if Ztop >= 0
         error("Input error: the cavity is too shallow!")
     end
-    
-    # Flatten X and Y to vectors (handles scalars, vectors, and matrices)
-    X_vec = X isa AbstractArray ? vec(X) : [X]
-    Y_vec = Y isa AbstractArray ? vec(Y) : [Y]
     
     # Calculate material properties
     nu = lambda / (lambda + mu) / 2  # Poisson's ratio
@@ -201,180 +215,71 @@ function fECM(X, Y, X0, Y0, depth, omegaX, omegaY, omegaZ,
                                    ax, ay, az, Cr, Nmax)
     Ns = length(Xs)
     
-    # Scale by weights
-    DVx_scaled = DVx * Ws
-    DVy_scaled = DVy * Ws
-    DVz_scaled = DVz * Ws
-    
-    # Calculate displacements
-    ue, un, uv = pCDM_Vec(X_vec, Y_vec, Xs, Ys, -Zs, omegaX, omegaY, omegaZ,
-                          DVx_scaled, DVy_scaled, DVz_scaled, nu)
-    
-    # Reshape outputs to match input shape
-    original_size = size(X)
-    ue = reshape(ue, original_size)
-    un = reshape(un, original_size)
-    uv = reshape(uv, original_size)
-    
-    return ue, un, uv, dV, DV, Ns
+    # Orientation of the PTDs along the rotated X, Y, Z axes: (sin, cos) of strike - 90 and of dip
+    R = fec_rotation((omegaX, omegaY, omegaZ))
+    ptd = ntuple(Val(3)) do j
+        strike = iszero(hypot(R[1, j], R[2, j])) ? zero(R[1, j]) : atand(-R[2, j], R[1, j])
+        T.((sincosd(strike - 90)..., sincosd(acosd(R[3, j]))...))
+    end
+
+    return (; x0 = T.(Xs), y0 = T.(Ys), d = T.(-Zs), DV = (T.(DVx * Ws), T.(DVy * Ws), T.(DVz * Ws)),
+              ptd, nu = T(nu), dV = T(dV), DVtot = T(DV), Ns)
 end
 
+# Surface displacements (ue, un, uv) at `X`, `Y` and the source summary of `fECM`.
+function fecm_eval(X, Y, src)
+    X isa AbstractArray && axes(X) != axes(Y) && throw(DimensionMismatch("X and Y must have the same axes: $(axes(X)) vs $(axes(Y))"))
+    U = map((x, y) -> pcdm_surf(x, y, src), X isa AbstractArray ? X : fill(X), Y isa AbstractArray ? Y : fill(Y))
+    return getindex.(U, 1), getindex.(U, 2), getindex.(U, 3), src.dV, src.DVtot, src.Ns
+end
 
 """
-    pCDM_Vec(X, Y, X0, Y0, depth, omegaX, omegaY, omegaZ, DVx, DVy, DVz, nu)
+    ue, un, uv = pcdm_surf(x, y, src)
 
-Vectorized version of the pCDM (point Compound Dislocation Model) function.
-Calculates surface displacements from compound dislocation sources.
-
-# Arguments
-- `X`, `Y`: Observation point coordinates (vectors)
-- `X0`, `Y0`, `depth`: Source location coordinates (can be vectors for multiple sources)
-- `omegaX`, `omegaY`, `omegaZ`: Rotation angles in degrees
-- `DVx`, `DVy`, `DVz`: Potency components (can be vectors for multiple sources)
-- `nu`: Poisson's ratio
-
-# Returns
-- `ue`, `un`, `uv`: Displacement components (East, North, Vertical)
+Surface displacement at the point (`x`, `y`) due to the sources `src` of `fecm_sources`:
+the sum of three point tensile dislocations (PTDs) per source (Nikkhoo et al., 2017).
 """
-function pCDM_Vec(X, Y, X0, Y0, depth, omegaX, omegaY, omegaZ,
-                  DVx, DVy, DVz, nu)
-    
-    # Ensure X and Y are vectors
-    X = X isa AbstractArray ? vec(X) : [X]
-    Y = Y isa AbstractArray ? vec(Y) : [Y]
-    
-    # Build rotation matrices
-    Rx = [1  0            0;
-          0  cosd(omegaX)  sind(omegaX);
-          0 -sind(omegaX)  cosd(omegaX)]
-    
-    Ry = [cosd(omegaY)  0  -sind(omegaY);
-          0             1   0;
-          sind(omegaY)  0   cosd(omegaY)]
-    
-    Rz = [cosd(omegaZ)   sind(omegaZ)  0;
-         -sind(omegaZ)   cosd(omegaZ)  0;
-          0              0             1]
-    
-    R = Rz * Ry * Rx
-    
-    # Calculate strike and dip for first PTD (X-axis direction)
-    Vstrike1 = [-R[2,1], R[1,1], 0]
-    Vstrike1 = Vstrike1 / norm(Vstrike1)
-    strike1 = atan(Vstrike1[1], Vstrike1[2]) * 180 / π
-    if isnan(strike1)
-        strike1 = 0.0
+function pcdm_surf(x, y, src)
+    (; x0, y0, d, DV, ptd, nu) = src
+    ue = un = uv = zero(float(x))
+    for j in 1:3
+        sb, cb, sd, cd = ptd[j]
+        DVj = DV[j]
+        e0 = n0 = v0 = zero(ue)
+        # x0, y0, d, DVj share their indices (fecm_sources); the multi-array eachindex
+        # would build an error message, which GPU kernels cannot
+        for k in eachindex(x0)
+            xM, yM, dk = x - x0[k], y - y0[k], d[k]
+            # PTD frame
+            xr = xM * cb - yM * sb
+            yr = xM * sb + yM * cb
+            r  = sqrt(xr^2 + yr^2 + dk^2)
+            r3 = r^3
+            r5 = r3 * r^2   # Base computes Float32 ^5 in Float64
+            q  = yr * sd - dk * cd
+            I1 = (1 - 2nu) * yr * (1 / r / (r + dk)^2 - xr^2 * (3r + dk) / r3 / (r + dk)^3)
+            I2 = (1 - 2nu) * xr * (1 / r / (r + dk)^2 - yr^2 * (3r + dk) / r3 / (r + dk)^3)
+            I3 = (1 - 2nu) * xr / r3 - I2
+            I5 = (1 - 2nu) * (1 / r / (r + dk) - xr^2 * (2r + dk) / r3 / (r + dk)^2)
+            # For a PTD M0 = DV*mu
+            c  = DVj[k] / 2 / π
+            e0 += c * (3xr * q^2 / r5 - I3 * sd^2)
+            n0 += c * (3yr * q^2 / r5 - I1 * sd^2)
+            v0 += c * (3dk * q^2 / r5 - I5 * sd^2)
+        end
+        # Rotate back to EFCS
+        ue +=  e0 * cb + n0 * sb
+        un += -e0 * sb + n0 * cb
+        uv +=  v0
     end
-    dip1 = acosd(R[3,1])
-    
-    # Calculate strike and dip for second PTD (Y-axis direction)
-    Vstrike2 = [-R[2,2], R[1,2], 0]
-    Vstrike2 = Vstrike2 / norm(Vstrike2)
-    strike2 = atan(Vstrike2[1], Vstrike2[2]) * 180 / π
-    if isnan(strike2)
-        strike2 = 0.0
-    end
-    dip2 = acosd(R[3,2])
-    
-    # Calculate strike and dip for third PTD (Z-axis direction)
-    Vstrike3 = [-R[2,3], R[1,3], 0]
-    Vstrike3 = Vstrike3 / norm(Vstrike3)
-    strike3 = atan(Vstrike3[1], Vstrike3[2]) * 180 / π
-    if isnan(strike3)
-        strike3 = 0.0
-    end
-    dip3 = acosd(R[3,3])
-    
-    # Calculate contribution of the first PTD
-    ue1, un1, uv1 = PTD_disp_Surf_Vec(X, Y, X0, Y0, depth, strike1, dip1, DVx, nu)
-    
-    # Calculate contribution of the second PTD
-    ue2, un2, uv2 = PTD_disp_Surf_Vec(X, Y, X0, Y0, depth, strike2, dip2, DVy, nu)
-    
-    # Calculate contribution of the third PTD
-    ue3, un3, uv3 = PTD_disp_Surf_Vec(X, Y, X0, Y0, depth, strike3, dip3, DVz, nu)
-    
-    # Sum contributions
-    ue = ue1 + ue2 + ue3
-    un = un1 + un2 + un3
-    uv = uv1 + uv2 + uv3
-    
     return ue, un, uv
 end
+
 
 """
 Helper function to safely convert scalars or arrays to vectors
 """
 vec_safe(x) = x isa AbstractArray ? vec(x) : [x]
-
-
-"""
-    PTD_disp_Surf_Vec(X, Y, X0, Y0, depth, strike, dip, DV, nu)
-
-Vectorized version of PTD_disp_Surf function in the pCDM function.
-Calculates surface displacement from Point Tensile Dislocation sources.
-
-# Arguments
-- `X`, `Y`: Observation point coordinates (vectors)
-- `X0`, `Y0`, `depth`: Source location(s) - can be scalars or vectors
-- `strike`, `dip`: Fault orientation parameters (degrees)
-- `DV`: Potency - can be scalar or vector (same size as X0, Y0, depth)
-- `nu`: Poisson's ratio
-
-# Returns
-- `ue`, `un`, `uv`: Displacement components (East, North, Vertical)
-"""
-function PTD_disp_Surf_Vec(X, Y, X0, Y0, depth, strike, dip, DV, nu)
-    
-    # Ensure X and Y are column vectors
-    X = X isa AbstractArray ? vec(X) : [X]
-    Y = Y isa AbstractArray ? vec(Y) : [Y]
-    
-    # X0, Y0, depth and DV must be row vectors of the same size
-    # Use reshape to ensure they are proper 1×N matrices (not just transposed 1D arrays)
-    X0 = X0 isa AbstractArray ? reshape(vec(X0), 1, :) : reshape([X0], 1, 1)
-    Y0 = Y0 isa AbstractArray ? reshape(vec(Y0), 1, :) : reshape([Y0], 1, 1)
-    depth = depth isa AbstractArray ? reshape(vec(depth), 1, :) : reshape([depth], 1, 1)
-    DV = DV isa AbstractArray ? reshape(vec(DV), 1, :) : reshape([DV], 1, 1)
-    
-    # Create matrices using broadcasting (more efficient than repmat)
-    xM = X .- X0  # Outer subtraction creates matrix
-    yM = Y .- Y0
-    d = ones(length(X), 1) * depth  # Column vector * row vector = matrix
-    DV_mat = ones(length(X), 1) * DV
-    
-    beta = strike - 90
-    x = xM .* cosd(beta) .- yM .* sind(beta)
-    y = xM .* sind(beta) .+ yM .* cosd(beta)
-    
-    r = sqrt.(x.^2 .+ y.^2 .+ d.^2)
-    q = y .* sind(dip) .- d .* cosd(dip)
-    
-    # Calculate integral terms
-    I1 = (1 - 2*nu) .* y .* (1 ./ r ./ (r .+ d).^2 .- 
-         x.^2 .* (3 .* r .+ d) ./ r.^3 ./ (r .+ d).^3)
-    I2 = (1 - 2*nu) .* x .* (1 ./ r ./ (r .+ d).^2 .- 
-         y.^2 .* (3 .* r .+ d) ./ r.^3 ./ (r .+ d).^3)
-    I3 = (1 - 2*nu) .* x ./ r.^3 .- I2
-    I5 = (1 - 2*nu) .* (1 ./ r ./ (r .+ d) .- 
-         x.^2 .* (2 .* r .+ d) ./ r.^3 ./ (r .+ d).^2)
-    
-    # Note: For a PTD M0 = DV*mu!
-    ue = DV_mat ./ (2 * π) .* (3 .* x .* q.^2 ./ r.^5 .- I3 .* sind(dip)^2)
-    un = DV_mat ./ (2 * π) .* (3 .* y .* q.^2 ./ r.^5 .- I1 .* sind(dip)^2)
-    uv = DV_mat ./ (2 * π) .* (3 .* d .* q.^2 ./ r.^5 .- I5 .* sind(dip)^2)
-    
-    # Sum over all sources
-    ue0 = sum(ue, dims=2)
-    un0 = sum(un, dims=2)
-    uv = sum(uv, dims=2)
-    
-    # Rotate back to EFCS
-    ue = ue0 .* cosd(beta) .+ un0 .* sind(beta)
-    un = -ue0 .* sind(beta) .+ un0 .* cosd(beta)
-    
-    return vec(ue), vec(un), vec(uv)
-end
 
 
 """
@@ -1010,16 +915,8 @@ function Ell_Plane_Intersect(ax, ay, az, a, b, c, d)
     # Build Pc matrix - each row is a center point
     Pc = hcat(Ck .* ax^2 * a, Ck .* ay^2 * b, Ck .* az^2 * c)
     
-    # If multiple planes, replicate the basis vectors
-    # eMaj and eMin are the same for all planes (only scaling changes)
-    if length(d) > 1
-        # Create matrices where each row is the same basis vector
-        eMaj_mat = repeat(eMaj', length(d), 1)
-        eMin_mat = repeat(eMin', length(d), 1)
-        return Pc, aMaj, aMin, eMaj_mat, eMin_mat
-    else
-        return Pc, aMaj, aMin, eMaj, eMin
-    end
+    # One row per plane: the basis vectors are shared, only the scaling changes
+    return Pc, aMaj, aMin, repeat(eMaj', length(d), 1), repeat(eMin', length(d), 1)
 end
 
 
@@ -1181,42 +1078,40 @@ Reference:
   caused by pressurized finite ellipsoidal cavities.
   Geophys. J. Int., doi:10.1093/gji/ggac351
 """
-struct FiniteEllipsoidalCavity{_T, U1, U2, U3} <: AbstractSill{3, _T}
+struct FiniteEllipsoidalCavity{_T, U1, U2, U3, S} <: AbstractSill{3, _T}
     Center::GeoUnit{Point{3, _T}, U1}
     ax::GeoUnit{_T, U1}
     ay::GeoUnit{_T, U1}
     az::GeoUnit{_T, U1}
     Lengthscale::GeoUnit{_T, U1}
-    BoundingBox::Tuple
+    BoundingBox::NTuple{2, GeoUnit{Point{3, _T}, U1}}
     Angle::GeoUnit{Vec{3, _T}, U2}
     ΔP::GeoUnit{_T, U3}
     mu::GeoUnit{_T, U3}
     lambda::GeoUnit{_T, U3}
     Nmax::Int
     Cr::Int
+    Sources::S   # point-independent part of the solution, from `fecm_sources`
 end
 
 function FiniteEllipsoidalCavity(
     Center, ax, ay, az, Angle, ΔP, mu, lambda, Nmax=5000, Cr=14
 )
+    check_positive(FiniteEllipsoidalCavity, :ax, ax)
+    check_positive(FiniteEllipsoidalCavity, :ay, ay)
+    check_positive(FiniteEllipsoidalCavity, :az, az)
     Cg  = convert(GeoUnit, Center)
     axg = convert(GeoUnit, ax)
     ayg = convert(GeoUnit, ay)
     azg = convert(GeoUnit, az)
     Lengthscale = azg
     BoundingBox = unrotated_bounding_box(Cg, axg.val, ayg.val, azg.val)
+    Ag, ΔPg, mug, lambdag = convert(GeoUnit, Angle), convert(GeoUnit, ΔP), convert(GeoUnit, mu), convert(GeoUnit, lambda)
+    c, ω = Cg.val, Ag.val
+    Sources = fecm_sources(c[1], c[2], -c[3], ω[1], ω[2], ω[3], axg.val, ayg.val, azg.val,
+                           ΔPg.val, mug.val, lambdag.val, "C"; Nmax, Cr)
     return FiniteEllipsoidalCavity(
-        Cg,
-        axg,
-        ayg,
-        azg,
-        Lengthscale,
-        BoundingBox,
-        convert(GeoUnit, Angle),
-        convert(GeoUnit, ΔP),
-        convert(GeoUnit, mu),
-        convert(GeoUnit, lambda),
-        Int(Nmax), Int(Cr),
+        Cg, axg, ayg, azg, Lengthscale, BoundingBox, Ag, ΔPg, mug, lambdag, Int(Nmax), Int(Cr), Sources,
     )
 end
 
@@ -1224,7 +1119,7 @@ end
     FiniteEllipsoidalCavity(; Center, ax, ay, az, Angle, ΔP, mu, lambda, Nmax=5000, Cr=14)
 
 Keyword constructor. `Center` uses signed z (negative = depth), e.g.
-`Center = Point3(0.0, 0.0, -10250.0)*m`.
+`Center = Point3(0.0, 0.0, -10250.0)*m`. The semi-axes `ax`, `ay`, `az` must be positive.
 """
 function FiniteEllipsoidalCavity(;
     Center = Point3(0.0, 0.0, -10250.0) * m,
@@ -1320,32 +1215,45 @@ Surface displacement arrays at observation coordinates `X`, `Y`.
 Returns East (`ue`), North (`un`), and vertical (`uv`) components,
 plus volume change `dV`, potency `DV`, and number of point CDMs `Ns`.
 """
-function hostrock_displacement(
-    fec::FiniteEllipsoidalCavity, X::AbstractArray, Y::AbstractArray
-)
-    GeoParams.@unpack_val Center, ax, ay, az, Angle, ΔP, mu, lambda = fec
-
-    X0     = Center[1]
-    Y0     = Center[2]
-    depth  = -Center[3]
-    omegaX, omegaY, omegaZ = Angle[1], Angle[2], Angle[3]
-
-    return fECM(X, Y, X0, Y0, depth, omegaX, omegaY, omegaZ,
-                ax, ay, az, ΔP, mu, lambda, "C";
-                Nmax=fec.Nmax, Cr=fec.Cr)
-end
+hostrock_displacement(fec::FiniteEllipsoidalCavity, X::AbstractArray, Y::AbstractArray) =
+    fecm_eval(X, Y, fec.Sources)
 
 """
     d = hostrock_displacement(fec::FiniteEllipsoidalCavity, p::Point{3,_T})
 
-Surface displacement at a single observation point `p`.
-Only the horizontal coordinates `p[1]`, `p[2]` are used (surface model).
-Returns a `Vec3` (East, North, vertical).
+Surface displacement at a single observation point `p` on the free surface `z = 0`.
+Returns a `Vec3` (East, North, vertical). The solution is only defined at the
+surface, so a point with `p[3] != 0` throws an `ArgumentError`.
 """
 function hostrock_displacement(fec::FiniteEllipsoidalCavity, p::Point{3, _T}) where _T
-    ue, un, uv, _, _, _ = hostrock_displacement(fec, [p[1]], [p[2]])
-    return Vec3{_T}(ue[1], un[1], uv[1])
+    iszero(p[3]) || throw(ArgumentError("FiniteEllipsoidalCavity gives surface displacement only; got z = $(p[3]), expected 0"))
+    return kernel_displacement(fec, p)
 end
+
+kernel_displacement(fec::FiniteEllipsoidalCavity, p::Point{3, _T}) where {_T} = Vec3{_T}(pcdm_surf(p[1], p[2], fec.Sources)...)
+
+check_points(::FiniteEllipsoidalCavity, X) = all(iszero, X[3]) ||
+    throw(ArgumentError("FiniteEllipsoidalCavity gives surface displacement only; all z coordinates must be 0"))
+
+
+# Body-to-EFCS rotation of the cavity axes for angles (omegaX, omegaY, omegaZ) in degrees.
+# `sincos(deg2rad(ω))`, not `sincosd`: Base evaluates `sincosd(::Float32)` in Float64,
+# which GPU kernels calling `inside` cannot compile on Metal.
+function fec_rotation(Angle)
+    (sx, cx), (sy, cy), (sz, cz) = sincos(deg2rad(Angle[1])), sincos(deg2rad(Angle[2])), sincos(deg2rad(Angle[3]))
+    Rx = @SMatrix [1   0   0;
+                   0  cx  sx;
+                   0 -sx  cx]
+    Ry = @SMatrix [cy  0 -sy;
+                   0   1   0;
+                   sy  0  cy]
+    Rz = @SMatrix [cz  sz  0;
+                  -sz  cz  0;
+                   0   0   1]
+    return Rz * Ry * Rx
+end
+
+local_to_world(fec::FiniteEllipsoidalCavity, q) = Point3(fec.Center.val + fec_rotation(fec.Angle.val) * (q - fec.Center.val))
 
 
 # ---- inside --------------------------------------------------------------
@@ -1357,22 +1265,10 @@ Returns `true` if `p` is inside the (possibly rotated) ellipsoidal cavity.
 """
 function inside(p::Point{3, _T}, fec::FiniteEllipsoidalCavity; rotate::Bool=true) where _T
     GeoParams.@unpack_val Center, ax, ay, az, Angle = fec
-
-    omegaX, omegaY, omegaZ = Angle[1], Angle[2], Angle[3]
-
-    Rx = [1  0              0;
-          0  cosd(omegaX)   sind(omegaX);
-          0 -sind(omegaX)   cosd(omegaX)]
-    Ry = [cosd(omegaY)  0  -sind(omegaY);
-          0             1   0;
-          sind(omegaY)  0   cosd(omegaY)]
-    Rz = [cosd(omegaZ)   sind(omegaZ)  0;
-         -sind(omegaZ)   cosd(omegaZ)  0;
-          0              0             1]
-    R = Rz * Ry * Rx
+    R = fec_rotation(Angle)
 
     # Relative position in EFCS, then rotate to ellipsoid body frame
-    Δ = [p[1] - Center[1], p[2] - Center[2], p[3] - Center[3]]
+    Δ = SVector{3, _T}(p[1] - Center[1], p[2] - Center[2], p[3] - Center[3])
     Δb = rotate ? (R' * Δ) : Δ
 
     return (Δb[1]/ax)^2 + (Δb[2]/ay)^2 + (Δb[3]/az)^2 <= 1

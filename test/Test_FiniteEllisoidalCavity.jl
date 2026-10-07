@@ -108,3 +108,11 @@ fec_rot = FiniteEllipsoidalCavity(
 p_rot = Point3(700 / sqrt(2), -700 / sqrt(2), -10000.0)
 @test inside(p_rot, fec_rot) == true
 @test inside(p_rot, fec_rot; rotate=false) == false
+
+# deep, small sphere: a single partition; matches Mogi (1-ν)ΔP a³/(G d²) with ν = 0.25
+fec_small = FiniteEllipsoidalCavity(Center=Point3(0.0, 0.0, -5000.0)*m, ax=500.0m, ay=500.0m, az=500.0m,
+    Angle=Vec{3}(0.0, 0.0, 0.0)*NoUnits, ΔP=10e6Pa, mu=10e9Pa, lambda=10e9Pa)
+@test hostrock_displacement(fec_small, Point3(0.0, 0.0, 0.0))[3] ≈ 0.75 * 10e6 * 500^3 / (10e9 * 5000^2) rtol=1e-3
+
+# surface-only solution
+@test_throws "surface displacement only" hostrock_displacement(fec_small, Point3(0.0, 0.0, -10.0))

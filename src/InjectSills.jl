@@ -16,6 +16,7 @@ export volume, area
 
 include("Utils.jl")
 include("PennyShapedSills.jl")
+include("PlaneStrainSill.jl")
 include("SquareDikes.jl")
 include("SquareDikeTopAccretion.jl")
 include("CylindricalDikeTopAccretion.jl")

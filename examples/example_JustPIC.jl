@@ -1,89 +1,66 @@
-import Pkg
-
-function ensure_example_env!()
-    # Keep JustPIC optional for InjectSills itself by using a local env for this example.
-    env_dir = joinpath(@__DIR__, ".justpic_example_env")
-    Pkg.activate(env_dir)
-
-    pkgs = Set(keys(Pkg.project().dependencies))
-    if !("InjectSills" in pkgs)
-        Pkg.develop(path=joinpath(@__DIR__, ".."))
-    end
-    if !("JustPIC" in pkgs)
-        Pkg.add(name="JustPIC")
-    end
-
-    Pkg.instantiate()
-end
-
-ensure_example_env!()
-
+# Requires InjectSills, JustPIC and GLMakie in the active environment.
 using InjectSills
 using JustPIC
+using GLMakie
 
 const backend = JustPIC.CPU
+const HOST, MAGMA = 1.0, 2.0
 
-function maybe_plot(px, py, Dy, sill2D)
-    try
-        @eval begin
-            using GLMakie
-        end
-
-        ind = findall(.!isnan.(px) .& .!isnan.(py))
-        fig, ax, _ = GLMakie.scatter(px[ind]/1e3, py[ind]/1e3, color=Dy.data[ind], markersize=5)
-
-        inside_vec = zeros(Int32, size(px))
-        for I in eachindex(px)
-            if !isnan(px[I]) && !isnan(py[I])
-                inside_vec[I] = inside(Point2(px[I], py[I]), sill2D)
-            end
-        end
-        ind = findall(inside_vec .== 1)
-       # GLMakie.scatter!(ax, px[ind]/1e3, py[ind]/1e3, markersize=15)
-
-        x_poly, z_poly = dike_polygon(sill2D, 100)
-        GLMakie.lines!(ax, x_poly ./ 1e3, z_poly ./ 1e3, color=:red)
-
-        display(fig)
-    catch err
-        @warn "Skipping plotting (GLMakie unavailable or no display)." err
-    end
+# Active particles: x, y, then the values of each of `fields`.
+function active(particles, fields...)
+    ok = vec(particles.index.data)
+    return particles.coords[1].data[ok], particles.coords[2].data[ok], map(f -> f.data[ok], fields)...
 end
 
 function main()
-    nxcell, max_xcell, min_xcell = 24, 30, 12
-    n = 256
+    # max_xcell needs headroom: cells next to the opened sill end up with ~1.5 nxcell particles
+    nxcell, max_xcell, min_xcell = 24, 48, 12
+    n  = 256
     Lx = Ly = 10000.0
     xv = range(-Lx/2, Lx/2, length=n)
     yv = range(-Ly, 0, length=n)
-    xvi = (xv, yv)
 
     # Staggered velocity grids: vertex vector on the diagonal, extended cell centers off it.
-    xc = xv[1:end-1] .+ step(xv) / 2
-    yc = yv[1:end-1] .+ step(yv) / 2
+    xc  = xv[1:end-1] .+ step(xv) / 2
+    yc  = yv[1:end-1] .+ step(yv) / 2
     xce = range(xc[1] - step(xv), xc[end] + step(xv), length=length(xc) + 2)
     yce = range(yc[1] - step(yv), yc[end] + step(yv), length=length(yc) + 2)
-    grid_vx, grid_vy = (xv, yce), (xce, yv)
+    particles = init_particles(backend, nxcell, max_xcell, min_xcell, (xv, yce), (xce, yv))
 
-    particles = init_particles(backend, nxcell, max_xcell, min_xcell, grid_vx, grid_vy)
+    sill = PennyShapedSill(Center=Point2(0, -5000)*m, H=40.0m, R=2000.0m, Angle=Vec1(30))
 
-    sill2D = PennyShapedSill(Center=Point2(0, -5000)*m, H=40.0m, W=2000.0m, Angle=Vec1(30))
-    #sill2D = McTigueSphere(Center=Point2(0, -5000)*m, r=15.0m)
+    Dx, Dy, phase = init_cell_arrays(particles, Val(3))
+    phase.data .= HOST
+    x0, y0, _ = active(particles, phase)
 
-    Dx, Dy = init_cell_arrays(particles, Val(2))
-    inject_sill!(particles, Dx, Dy, xvi, sill2D)
+    inject_sill!(particles, Dx, Dy, sill; fields=(phase,), values=(MAGMA,), force_inject=true)
 
-    px = particles.coords[1].data
-    py = particles.coords[2].data
+    x1, y1, ph, ux, uy = active(particles, phase, Dx, Dy)
+    host, magma = ph .== HOST, ph .== MAGMA
+    println("particles before: $(length(x0)), after: $(length(x1)) (host $(count(host)), magma $(count(magma)))")
+    println("host particles inside the sill: $(count(i -> inside(Point2(x1[i], y1[i]), sill), findall(host)))")
+    println("magma particles outside the sill: $(count(i -> !inside(Point2(x1[i], y1[i]), sill), findall(magma)))")
 
-    println("JustPIC example ran successfully.")
-    println("Particles: $(length(px))")
-    ind = findall(.!isnan.(px) .& .!isnan.(py))
-    println("Mean Dx: $(sum(Dx.data[ind]) / length(Dx.data[ind]))")
-    println("Mean Dy: $(sum(Dy.data[ind]) / length(Dy.data[ind]))")
+    # Before / after close-up around the sill center, and the full sill after injection
+    xp, zp = dike_polygon(sill, 200)
+    fig = Figure(size=(1500, 550))
+    win = (-300, 300, -5300, -4700)
+    for (col, (title, x, y, c)) in enumerate((("before", x0, y0, fill(HOST, length(x0))),
+                                              ("after", x1, y1, ph)))
+        ax = Axis(fig[1, col]; title, aspect=DataAspect(), xlabel="x [m]", ylabel="z [m]", limits=win)
+        sel = @. win[1] <= x <= win[2] && win[3] <= y <= win[4]
+        scatter!(ax, x[sel], y[sel]; color=c[sel], colorrange=(HOST, MAGMA), colormap=[:gray70, :red], markersize=3)
+        lines!(ax, xp, zp; color=:black)
+    end
+    ax = Axis(fig[1, 3]; title="host-rock displacement |u| [m]", aspect=DataAspect(), xlabel="x [km]", ylabel="z [km]")
+    sel = findall(host)[1:20:end]
+    sc  = scatter!(ax, x1[sel] ./ 1e3, y1[sel] ./ 1e3; color=hypot.(ux[sel], uy[sel]), colormap=:viridis, markersize=2)
+    lines!(ax, xp ./ 1e3, zp ./ 1e3; color=:red)
+    Colorbar(fig[1, 4], sc)
 
-    maybe_plot(px, py, Dy, sill2D)
-    return nothing
+    save(joinpath(@__DIR__, "example_JustPIC.png"), fig)
+    display(fig)
+    return particles, phase
 end
 
 main()

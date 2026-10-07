@@ -23,7 +23,7 @@ struct SquareDike{N, _T, N1, N2, U1, U2, U3} <: AbstractSill{N, _T}
     W::GeoUnit{_T, U1}
     H::GeoUnit{_T, U1}
     Lengthscale::GeoUnit{_T, U1}
-    BoundingBox::Tuple
+    BoundingBox::NTuple{2, GeoUnit{Point{N, _T}, U1}}
     RotMat::GeoUnit{SMatrix{N, N, _T, N2}, U3}
 end
 Adapt.@adapt_structure SquareDike
@@ -33,7 +33,7 @@ isdimensional(s::SquareDike) = isdimensional(s.W)
 """
     SquareDike(; Center=Point2(0.0, -5000.0)*m, Angle=Vec1(0.0)*NoUnits, W=2000.0m, H=100.0m)
 
-Construct a square-dike source with keyword arguments.
+Construct a square-dike source with keyword arguments. `W` and `H` must be positive.
 """
 function SquareDike(;
     Center = Point2(0.0, -5000.0) * m,
@@ -42,6 +42,8 @@ function SquareDike(;
     H      = 100.0m,
 )
     @assert length(Center) == length(Angle) + 1
+    check_positive(SquareDike, :W, W)
+    check_positive(SquareDike, :H, H)
     RotMat = RotationMatrix(ustrip.(Angle))
     Cg = convert(GeoUnit, Center)
     Wg = convert(GeoUnit, W)

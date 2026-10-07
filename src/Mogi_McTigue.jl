@@ -9,7 +9,8 @@ export MogiSphere, McTigueSphere
 """
     MogiSphere{N,_T}
 
-Pressurized spherical cavity in an elastic half-space (Mogi, 1958).
+Pressurized spherical cavity in an elastic half-space (Mogi, 1958). The displacement is the
+half-space surface solution, evaluated at every point.
 
 Parameters:
 ===
@@ -32,7 +33,7 @@ struct MogiSphere{N, _T, U1, U2, U3} <: AbstractSill{N, _T}
     G::GeoUnit{_T, U2}
     ν::GeoUnit{_T, U3}
     Lengthscale::GeoUnit{_T, U1}
-    BoundingBox::Tuple
+    BoundingBox::NTuple{2, GeoUnit{Point{N, _T}, U1}}
 end
 Adapt.@adapt_structure MogiSphere
 
@@ -42,6 +43,7 @@ isdimensional(s::MogiSphere) = isdimensional(s.G)
     MogiSphere(; Center=Point2(0.0,-5000.0)*m, r=1500.0m, ΔP=10e6Pa, G=10e9Pa, ν=0.25*NoUnits)
 
 Construct a Mogi spherical pressure source with keyword arguments.
+`r` must be positive and `ν` must satisfy `-1 < ν ≤ 0.5`.
 """
 function MogiSphere(;
     Center = Point2(0.0, -5000.0) * m,
@@ -50,6 +52,8 @@ function MogiSphere(;
     G      = 10e9Pa,
     ν      = 0.25 * NoUnits,
 )
+    check_positive(MogiSphere, :r, r)
+    check_poisson_ratio(MogiSphere, ν; incompressible=true)
     Cg = convert(GeoUnit, Center)
     rg = convert(GeoUnit, r)
     Lengthscale = rg
@@ -128,7 +132,7 @@ struct McTigueSphere{N, _T, U1, U2, U3} <: AbstractSill{N, _T}
     G::GeoUnit{_T, U2}
     ν::GeoUnit{_T, U3}
     Lengthscale::GeoUnit{_T, U1}
-    BoundingBox::Tuple
+    BoundingBox::NTuple{2, GeoUnit{Point{N, _T}, U1}}
 end
 Adapt.@adapt_structure McTigueSphere
 
@@ -136,6 +140,8 @@ isdimensional(s::McTigueSphere) = isdimensional(s.G)
 
 """
     McTigueSphere(; Center=Point2(0.0,-5000.0)*m, r=1500.0m, ΔP=10e6Pa, G=10e9Pa, ν=0.25*NoUnits)
+
+`r` must be positive and `ν` must satisfy `-1 < ν ≤ 0.5`.
 """
 function McTigueSphere(;
     Center = Point2(0.0, -5000.0) * m,
@@ -144,6 +150,8 @@ function McTigueSphere(;
     G      = 10e9Pa,
     ν      = 0.25 * NoUnits,
 )
+    check_positive(McTigueSphere, :r, r)
+    check_poisson_ratio(McTigueSphere, ν; incompressible=true)
     Cg = convert(GeoUnit, Center)
     rg = convert(GeoUnit, r)
     Lengthscale = rg
@@ -217,8 +225,7 @@ function hostrock_displacement(sill::MogiSphere{N, _T}, p::Point{N, _T}) where {
     for i in 1:N
         R_sq += Δ[i]^2
     end
-    R = sqrt(R_sq)
-    if R < 1e-8; R = convert(_T, 1e-8); end
+    R = max(sqrt(R_sq), _T(1e-8))
 
     C = r^3 * ΔP * (1 - ν) / (G * R^3)
 
@@ -233,8 +240,8 @@ end
     d = hostrock_displacement(sill::McTigueSphere{N,_T}, p::Point{N,_T})
 
 Displacement at `p` due to a McTigue spherical pressure source.
-Adds a `(r/d)³` finite-size correction to the Mogi solution, where `d`
-is the vertical distance from source centre to observation point.
+Adds a `(r/d)³` finite-size correction to the Mogi solution, where `d = |Center[N]|`
+is the depth of the source below `z = 0`.
 """
 function hostrock_displacement(sill::McTigueSphere{N, _T}, p::Point{N, _T}) where {N, _T}
     GeoParams.@unpack_val ν, G, r, ΔP, Center = sill
@@ -244,11 +251,9 @@ function hostrock_displacement(sill::McTigueSphere{N, _T}, p::Point{N, _T}) wher
     for i in 1:N
         R_sq += Δ[i]^2
     end
-    R = sqrt(R_sq)
-    if R < 1e-8; R = convert(_T, 1e-8); end
+    R = max(sqrt(R_sq), _T(1e-8))
 
-    d = abs(Center[N])
-    if d < 1e-8; d = convert(_T, 1e-8); end
+    d = max(abs(Center[N]), _T(1e-8))
 
     C = r^3 * ΔP * (1 - ν) / (G * R^3)
 

@@ -13,7 +13,7 @@ proj      = ProjectionPoint(; Lat=mean(Topo.lat.val[:]), Lon=mean(Topo.lon.val[:
 Topo_cart = convert2CartData(Topo, proj)
 
 # Define a sill (dimensions in metres)
-sill3D = PennyShapedSill(Center=Point3(0, 0, -3000)*m, H=100.0m, W=2000.0m, Angle=Vec2(10, -20))
+sill3D = PennyShapedSill(Center=Point3(0, 0, -3000)*m, H=100.0m, R=2000.0m, Angle=Vec2(10, -20))
 
 # Compute surface deformation and add as a field to the CartData
 # Displacement_m = (Ux, Uy, Uz) tuple in metres

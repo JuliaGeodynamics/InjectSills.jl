@@ -8,13 +8,14 @@ using GeophysicalModelGenerator
     cart_out   = surface_displacement(sill::AbstractSill{3}, cart::CartData; add_fields=true)
 
 Compute the surface displacement induced by `sill` at every point of the `CartData` surface
-`cart`. The sill must be in dimensional (SI) units. `CartData` coordinates are in km and are
-converted to metres internally before calling `hostrock_displacement`.
+`cart`. The sill must be dimensional with lengths in m; otherwise an `ArgumentError` is thrown.
+`CartData` coordinates are in km and are converted to meters internally before calling
+`hostrock_displacement`.
 
-Returns `(Ux, Uy, Uz)` as arrays in metres by default.
+Returns `(Ux, Uy, Uz)` as arrays in meters by default.
 
 If `add_fields = true`, the displacement arrays are added to the `CartData` as named fields
-`(:Ux, :Uy, :Uz)` in metres and the updated `CartData` is returned.
+`(:Ux, :Uy, :Uz)` in meters and the updated `CartData` is returned.
 
 # Example
 ```julia
@@ -44,26 +45,14 @@ function InjectSills.surface_displacement(
     cart::CartData;
     add_fields::Bool = false,
 ) where {_T}
-    x_km = cart.x.val   # arrays in km
-    y_km = cart.y.val
-    z_km = cart.z.val
-
-    Ux = similar(x_km, Float64)
-    Uy = similar(x_km, Float64)
-    Uz = similar(x_km, Float64)
-
-    for I in eachindex(x_km)
-        # convert km → m for the displacement calculation
-        p = Point3{Float64}(
-            Float64(x_km[I]) * 1e3,
-            Float64(y_km[I]) * 1e3,
-            Float64(z_km[I]) * 1e3,
-        )
-        d = hostrock_displacement(sill, p)
-        Ux[I] = d[1]
-        Uy[I] = d[2]
-        Uz[I] = d[3]
+    # All length fields of a sill share the unit of `Center`.
+    if !(InjectSills.isdimensional(sill.Center) && sill.Center.unit == m)
+        got = InjectSills.isdimensional(sill.Center) ? "lengths in $(sill.Center.unit)" : "a nondimensionalized sill"
+        throw(ArgumentError("surface_displacement: the sill must have lengths in m (CartData coordinates in km are converted to m); got $got"))
     end
+
+    X = map(c -> _T.(1e3 .* c), (cart.x.val, cart.y.val, cart.z.val))   # km → m
+    Ux, Uy, Uz = hostrock_displacement!(ntuple(_ -> similar(X[1]), 3), sill, X)
 
     if add_fields
         Displacement_m = (Ux, Uy, Uz)

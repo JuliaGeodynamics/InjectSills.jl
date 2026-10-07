@@ -9,7 +9,7 @@ export update_abstractsill
 
 
 """
-    PennyShapedSill{N,N1,_T}
+    PennyShapedSill{N,_T}
 
 Holds information about a penny shaped sill in 2D or 3D.
 
@@ -21,15 +21,18 @@ Parameters:
 - `ν::_T`                 - Poisson's ratio
 - `ΔP::_T`                - Overpressure within sill
 - `Q::_T`                 - Total injected volume of sill [m^3]
-- `W::_T = (3*E*Q/(16*(1-ν^2)*ΔP))^(1.0/3.0)`     - Width of sill
-- `H::_T = 8*(1-ν^2)*ΔP*W/(π*E)`                  - Maximum thickness of sill
+- `R::_T = cbrt(3*E*Q/(16*(1-ν^2)*ΔP))`     - Radius (3D) or half-length of the axisymmetric section (2D)
+- `H::_T = 8*(1-ν^2)*ΔP*R/(π*E)`                  - Maximum thickness of sill
+
+A 2D sill is the axisymmetric section of the penny: its displacement is the 3D solution in
+the vertical plane through the sill axis, and `ΔP` and `Q` are those of the 3D penny. For a
+sill in a Cartesian 2D (plane-strain) model, use [`PlaneStrainSill`](@ref).
 
 Reference:
 ===
    Sun, R.J., 1969. Theoretical size of hydraulically induced horizontal fractures and
         corresponding surface uplift in an idealized medium. J. Geophys. Res. 74, 5995–6011.
         https://doi.org/10.1029/JB074i025p05995
-
 """
 struct PennyShapedSill{N, _T, N1, N2, U1, U2, U3, U4, U5} <: AbstractSill{N,_T}
     Center::GeoUnit{Point{N, _T},U1}  # m
@@ -38,92 +41,90 @@ struct PennyShapedSill{N, _T, N1, N2, U1, U2, U3, U4, U5} <: AbstractSill{N,_T}
     ν::GeoUnit{_T,U4}   # []
     ΔP::GeoUnit{_T,U3}  # Pa
     Q::GeoUnit{_T,U5}   # m^3
-    W::GeoUnit{_T,U1}   # m
+    R::GeoUnit{_T,U1}   # m
     H::GeoUnit{_T,U1}   # m
     Lengthscale::GeoUnit{_T,U1}
-    BoundingBox::Tuple
+    BoundingBox::NTuple{2, GeoUnit{Point{N, _T}, U1}}
     RotMat::GeoUnit{SMatrix{N,N,_T,N2},U4}             # rotation matrix (precomputed for efficiency)
-    RotMat_negative::GeoUnit{SMatrix{N,N,_T,N2},U4}    # with negative angle
 end
 Adapt.@adapt_structure PennyShapedSill
 
 isdimensional(s::PennyShapedSill) = isdimensional(s.E)
 
 """
-    PennyShapedSill(; W=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e10Pa, ν=0.3*NoUnits, Angle=Vec1(0.0)*Pas, Center=Point2(0.0)*m)
+    PennyShapedSill(; R=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e10Pa, ν=0.3*NoUnits, Angle=Vec1(0.0)*NoUnits, Center=Point2(0.0)*m)
 
-Defines parameters for a penny shaped sill in an elastic halfspace.
-You can give various combinations of parameters to define the sill:
-- `ΔP` and `H`
-- `H` and `Q`
-- `W` and `H`
-- `W` and `Q`
-- `W` and `ΔP`
+Defines parameters for a penny shaped sill in a homogeneous elastic medium.
+The geometry is set by at most two of `R`, `H`, `ΔP`, `Q`:
+- any two of them (`R`+`H`, `R`+`Q`, `R`+`ΔP`, `H`+`Q`, `H`+`ΔP`, `Q`+`ΔP`)
+- only `Q` (with `ΔP = 1e6Pa`) or only `ΔP` (with the `R` of the default sill)
+- none of them (defaults `ΔP = 1e6Pa`, `Q = 1000m^3`)
+
+Giving three or four of them, or only `R` or only `H`, throws an `ArgumentError`.
+`R`, `H`, `ΔP` and `Q` must be positive, and `ν` must satisfy `-1 < ν < 0.5`
+(the solution of Sun (1969) contains `1/(1-2ν)`).
 """
-function PennyShapedSill(; W=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e10Pa, ν=0.3*NoUnits, Angle=Vec1(0.0)*Pas, Center=Point2(0.0)*m)
+function PennyShapedSill(; R=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e10Pa, ν=0.3*NoUnits, Angle=Vec1(0.0)*NoUnits, Center=Point2(0.0)*m)
     @assert length(Center)==length(Angle)+1
+    check_poisson_ratio(PennyShapedSill, ν; incompressible=false)
+    check_geometry(PennyShapedSill, R, H, ΔP, Q)
 
-    if isnothing(W) && isnothing(Q) && isnothing(ΔP) && isnothing(H)
+    if isnothing(R) && isnothing(Q) && isnothing(ΔP) && isnothing(H)
         ΔP  =  1e6*Pa
         Q   =  1000.0*m^3
-        W   =  (3*E*Q/(16*(1-ν^2)*ΔP))^(1.0/3.0)
-        H   =  8*(1-ν^2)*ΔP*W/(π*E)
+        R   =  cbrt(3*E*Q/(16*(1-ν^2)*ΔP))
+        H   =  8*(1-ν^2)*ΔP*R/(π*E)
 
-    elseif isnothing(W) && isnothing(Q) && !isnothing(ΔP) && isnothing(H)
-        # Use the default reference width and recompute H and Q for the
+    elseif isnothing(R) && isnothing(Q) && !isnothing(ΔP) && isnothing(H)
+        # Use the default reference radius and recompute H and Q for the
         # user-provided overpressure.
         Q_ref = 1000.0*m^3
         ΔP_ref = 1e6*Pa
-        W   =  (3*E*Q_ref/(16*(1-ν^2)*ΔP_ref))^(1.0/3.0)
-        H   =  8*(1-ν^2)*ΔP*W/(π*E)
-        Q   =  16*(1-ν^2)*ΔP*W^3/(3*E)
+        R   =  cbrt(3*E*Q_ref/(16*(1-ν^2)*ΔP_ref))
+        H   =  8*(1-ν^2)*ΔP*R/(π*E)
+        Q   =  16*(1-ν^2)*ΔP*R^3/(3*E)
 
-    elseif isnothing(W) && !isnothing(Q) && !isnothing(ΔP) && isnothing(H)
-        W   =  (3*E*Q/(16*(1-ν^2)*ΔP))^(1.0/3.0)
-        H   =  8*(1-ν^2)*ΔP*W/(π*E)
+    elseif isnothing(R) && !isnothing(Q) && !isnothing(ΔP) && isnothing(H)
+        R   =  cbrt(3*E*Q/(16*(1-ν^2)*ΔP))
+        H   =  8*(1-ν^2)*ΔP*R/(π*E)
 
-    elseif isnothing(W) && !isnothing(Q) && isnothing(ΔP) && isnothing(H)
+    elseif isnothing(R) && !isnothing(Q) && isnothing(ΔP) && isnothing(H)
         ΔP  =  1e6*Pa
-        W   =  (3*E*Q/(16*(1-ν^2)*ΔP))^(1.0/3.0)
-        H   =  8*(1-ν^2)*ΔP*W/(π*E)
+        R   =  cbrt(3*E*Q/(16*(1-ν^2)*ΔP))
+        H   =  8*(1-ν^2)*ΔP*R/(π*E)
 
-    elseif !isnothing(W) && !isnothing(Q)
-        ΔP = 3*E*Q/(16*(1-ν^2)*W^3)
-        H  = (3 * Q) / (2 * π * W^2)
+    elseif !isnothing(R) && !isnothing(Q)
+        ΔP = 3*E*Q/(16*(1-ν^2)*R^3)
+        H  = (3 * Q) / (2 * R^2 * π)
 
-    elseif !isnothing(W) && !isnothing(H)
-        ΔP = (π * E * H) / (8 * (1 - ν^2) * W)
-        Q = (2 * π * H * W^2) / 3
+    elseif !isnothing(R) && !isnothing(H)
+        ΔP = (π * E * H) / (8 * (1 - ν^2) * R)
+        Q = (2 * H * R^2 * π) / 3
 
-    elseif !isnothing(W) && !isnothing(ΔP)
-        H = 8 * (1 - ν^2) * ΔP * W / (π * E)
-        Q = 16 * (1 - ν^2) * ΔP * W^3 / (3 * E)
+    elseif !isnothing(R) && !isnothing(ΔP)
+        H = 8 * (1 - ν^2) * ΔP * R / (π * E)
+        Q = 16 * (1 - ν^2) * ΔP * R^3 / (3 * E)
 
     elseif !isnothing(H) && !isnothing(Q)
-        W = sqrt(3 * Q / (2 * π * H))
-        ΔP = (π * E * H) / (8 * (1 - ν^2) * W)
+        R = sqrt(3 * Q / (2 * H * π))
+        ΔP = (π * E * H) / (8 * (1 - ν^2) * R)
 
     elseif !isnothing(H) && !isnothing(ΔP)
-        W = (π * E * H) / (8 * (1 - ν^2) * ΔP)
-        Q = (π^3 * E^2 * H^3) / (96 * (1 - ν^2)^2 * ΔP^2)
-    end
-
-    if isnothing(W) || isnothing(Q) || isnothing(ΔP) || isnothing(H)
-        error("you need to specify W and Q or ΔP and H or combinations")
+        R = (π * E * H) / (8 * (1 - ν^2) * ΔP)
+        Q = 16 * (1 - ν^2) * ΔP * R^3 / (3 * E)
     end
 
     # Compute rotation matrix - as this is a relatively expensive operation, we precompute & store it in the struct
     RotMat = RotationMatrix(ustrip.(Angle))
-    RotMat_negative = RotMat'
 
     Cg = convert(GeoUnit, Center)
-    Wg = convert(GeoUnit, W)
+    Rg = convert(GeoUnit, R)
     Hg = convert(GeoUnit, H)
     Lengthscale = Hg
     BoundingBox = if length(Center) == 2
-        unrotated_bounding_box(Cg, Wg.val, Hg.val / 2)
+        unrotated_bounding_box(Cg, Rg.val, Hg.val / 2)
     else
-        unrotated_bounding_box(Cg, Wg.val, Wg.val, Hg.val / 2)
+        unrotated_bounding_box(Cg, Rg.val, Rg.val, Hg.val / 2)
     end
 
     return PennyShapedSill(
@@ -133,12 +134,11 @@ function PennyShapedSill(; W=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e
         convert(GeoUnit, ν),
         convert(GeoUnit, ΔP),
         convert(GeoUnit, Q),
-        Wg,
+        Rg,
         Hg,
         Lengthscale,
         BoundingBox,
         convert(GeoUnit, RotMat),
-        convert(GeoUnit, RotMat_negative),
     )
 end
 
@@ -146,80 +146,11 @@ end
 """
     PennyShapedSill(s::PennyShapedSill; kwargs...)
 
-Create a new penny-shaped sill from an existing one by changing any number of
-parameters.
-
-For updates of `W`, `H`, `ΔP`, or `Q`, a valid constructor combination is
-selected automatically.
+Create a new penny-shaped sill from an existing one by changing any of `Center`, `Angle`,
+`E`, `ν`, `R`, `H`, `ΔP`, `Q`, as [`update_abstractsill`](@ref) does. Numbers without unit
+for `E`, `ΔP`, `Q`, `R` or `H` take the unit of the value they replace.
 """
-function PennyShapedSill(s::PennyShapedSill; kwargs...)
-    valid = (:Center, :Angle, :E, :ν, :W, :H, :ΔP, :Q)
-    all(k -> k in valid, keys(kwargs)) ||
-        error("Invalid keyword for PennyShapedSill(s; ...). Valid keys are: $(valid)")
-
-    base = (
-        Center = UnitValue(s.Center),
-        Angle  = UnitValue(s.Angle),
-        E      = UnitValue(s.E),
-        ν      = UnitValue(s.ν),
-        W      = UnitValue(s.W),
-        H      = UnitValue(s.H),
-        ΔP     = UnitValue(s.ΔP),
-        Q      = UnitValue(s.Q),
-    )
-
-    kw = Dict{Symbol,Any}(kwargs)
-    for sym in (:E, :ΔP, :Q, :W, :H)
-        if haskey(kw, sym) && kw[sym] isa Number && !(kw[sym] isa typeof(oneunit(getproperty(base, sym))))
-            kw[sym] = kw[sym] * oneunit(getproperty(base, sym))
-        end
-    end
-
-    updated = merge(base, (; kw...))
-    gkeys = Set{Symbol}(k for k in keys(kwargs) if k in (:W, :H, :ΔP, :Q))
-
-    # Select the correct constructor branch for physically consistent updates.
-    W  = nothing
-    H  = nothing
-    ΔP = nothing
-    Q  = nothing
-
-    if isempty(gkeys)
-        W = updated.W
-        H = updated.H
-    elseif gkeys == Set([:W])
-        W = updated.W
-        H = updated.H
-    elseif gkeys == Set([:H])
-        W = updated.W
-        H = updated.H
-    elseif gkeys == Set([:ΔP])
-        H = updated.H
-        ΔP = updated.ΔP
-    elseif gkeys == Set([:Q])
-        H = updated.H
-        Q = updated.Q
-    elseif gkeys == Set([:W, :H])
-        W = updated.W
-        H = updated.H
-    elseif gkeys == Set([:W, :Q])
-        W = updated.W
-        Q = updated.Q
-    elseif gkeys == Set([:W, :ΔP])
-        W = updated.W
-        ΔP = updated.ΔP
-    elseif gkeys == Set([:H, :Q])
-        H = updated.H
-        Q = updated.Q
-    elseif gkeys == Set([:H, :ΔP])
-        H = updated.H
-        ΔP = updated.ΔP
-    else
-        error("Invalid W/H/ΔP/Q combination. Use one of: W, H, ΔP, Q, W+H, W+Q, W+ΔP, H+Q, H+ΔP")
-    end
-
-    return PennyShapedSill(; Center=updated.Center, Angle=updated.Angle, E=updated.E, ν=updated.ν, W, H, ΔP, Q)
-end
+PennyShapedSill(s::PennyShapedSill; kwargs...) = copy_RHΔPQ(PennyShapedSill, s; kwargs...)
 
 # Print info in the REPL
 function show(io::IO, g::PennyShapedSill)
@@ -237,14 +168,14 @@ function show(io::IO, g::PennyShapedSill)
     println(io, "   Overpressure            : $(UnitValue(g.ΔP)) ")
     println(io, "   Sill volume             : $(UnitValue(g.Q)) ")
     println(io, "   Maximum sill thickness  : $(UnitValue(g.H)) ")
-    println(io, "   Maximum sill width      : $(UnitValue(g.W)) ")
+    println(io, "   Radius                  : $(UnitValue(g.R)) ")
 
     return nothing
 end
 
 # Volume and area.
-volume(s::PennyShapedSill) =  4/3*π*UnitValue(s.W)*UnitValue(s.W)*(UnitValue(s.H)/2)   #   (equivalent 3D volume = injected Q, in m^3)
-area(s::PennyShapedSill) = π*UnitValue(s.W)*(UnitValue(s.H)/2)                          #   (vertical cross-section, in m^2)
+volume(s::PennyShapedSill) =  4/3*π*UnitValue(s.R)*UnitValue(s.R)*(UnitValue(s.H)/2)   #   (equivalent 3D volume = injected Q, in m^3)
+area(s::PennyShapedSill) = π*UnitValue(s.R)*(UnitValue(s.H)/2)                          #   (vertical cross-section, in m^2)
 
 """
     d = hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T})
@@ -253,7 +184,7 @@ Host rock displacement caused by opening of a penny shaped sill at point `p`
 """
 function hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T}) where {N,_T}
 
-    GeoParams.@unpack_val ν,E,W,H, ΔP, Center, Angle = sill;
+    GeoParams.@unpack_val ν,E,R,H, ΔP, Center, Angle = sill;
 
     # distance from points to center of sill
     Δ0 = p - Center
@@ -270,38 +201,18 @@ function hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T}) whe
     z = abs(Δ[N])
 
     # Function below cannot deal with zero
-    if r==0; r=1e-8; end
-    if z==0; z=1e-8; end
+    if r==0; r=_T(1e-8); end
+    if z==0; z=_T(1e-8); end
 
     # Compute displacement, using complex functions
-    # Remark: this may not work on GPU's, so we would have to mimic this effect somehow
-    Ur, Uz = compute_penny_shaped_displacement_complex(r, z, ΔP, ν, E, W)
-
-    # Numerical regularization close to the sill plane. The complex Sun solution
-    # can occasionally return pathological spikes for points very close to the
-    # intrusion plane inside the sill footprint.
-    #max_disp = 2 * W
-    #if !isfinite(Ur) || !isfinite(Uz) || abs(Ur) > max_disp || abs(Uz) > max_disp
-    #    z_reg = max(z, H / 2)
-    #    Ur, Uz = compute_penny_shaped_displacement_complex(r, z_reg, ΔP, ν, E, W)
-    #end
-    #Ur, Uz = compute_penny_shaped_displacement(r, z, ΔP, ν, E, W)
+    Ur, Uz = compute_penny_shaped_displacement_complex(r, z, ΔP, ν, E, R)
 
     if (Δ[N]<0); Uz = -Uz; end
-    if (Δ[1]<0); Ur = -Ur; end
 
-    Displacement  = Vec{N, _T}(Uz)
-    if N==2
-        Displacement = Vec2{_T}(Ur,Uz)
-    elseif N==3
-        x = abs(Δ[1])
-        y = abs(Δ[2])
-
-        Displacement = Vec3{_T}(x/r*Ur,y/r*Ur,Uz)
-    end
+    # Ur is the axisymmetric radial (outward) displacement; project onto the in-plane axes
+    Displacement = N == 2 ? Vec2{_T}(Δ[1]/r*Ur, Uz) : Vec3{_T}(Δ[1]/r*Ur, Δ[2]/r*Ur, Uz)
 
     # rotate backwards
-    #Displacement_r = rotate_point(Displacement, sill.RotMat_negative.val)
     Displacement_r = InjectSills.rotate_point(Displacement, sill.RotMat.val')
 
 
@@ -309,55 +220,33 @@ function hostrock_displacement(sill::PennyShapedSill{N,_T}, p::Point{N, _T}) whe
 end
 
 
-function compute_penny_shaped_displacement(r, z, ΔP, ν, E, W)
-    # Attempt to mimic the complex implementation of Sun (below) using real numbers
-    error("This does not work correctly, use the complex implementation")
-    # WRONG!!!
-    W2 = W^2
-    R1 = sqrt(r^2 + (z - W)^2)
-    R2 = sqrt(r^2 + (z + W)^2)
-
-    # equation 7a:
-    term1 = r * log((R2 + z + W) / (R1 + z - W))
-    term2 = r / 2 * ((W - 3z - R2) / (R2 + z + W) + (R1 + 3z + W) / (R1 + z - W))
-    term3 = (2 * z^2 * r) / (1 - 2ν) * (1 / (R2 * (R2 + z + W)) - 1 / (R1 * (R1 + z - W)))
-    term4 = (2 * z * r) / (1 - 2ν) * (1 / R2 - 1 / R1)
-    dU = ΔP * (1 + ν) * (1 - 2ν) / (2π * E) * (term1 - term2 - term3 + term4)
-
-    # equation 7b:
-    term5 = z * log((R2 + z + W) / (R1 + z - W))
-    term6 = R2 - R1
-    term7 = 1 / (2 * (1 - ν)) * (z * log((R2 + z + W) / (R1 + z - W)) - W * z * (1 / R2 + 1 / R1))
-    dW = 2 * ΔP * (1 - ν^2) / (π * E) * (term5 - term6 - term7)
-
-    Uz = dW  # vertical displacement should be corrected for z<0
-    Ur = dU
-
-    return Ur, Uz
-end
-
+# Complex division. Base divides Complex{Float32} in Float64, which GPUs without
+# Float64 support (Metal) cannot compile.
+cdiv(a, b) = a / b
+cdiv(a, b::Complex{Float32}) = a * conj(b) / abs2(b)
 
 """
-    compute_penny_shaped_displacement_complex(r, z, ΔP, ν, E, W)
+    compute_penny_shaped_displacement_complex(r, z, ΔP, ν, E, R)
 
 Compute the displacement around a penny-shaped sill in a homogeneous elastic halfspace using the original implementation of Sun that uses complex numbers.
 """
-function compute_penny_shaped_displacement_complex(r, z, ΔP, ν, E, W)
-    imW = im*W
-    R1  = sqrt(r^2. + (z - imW)^2);
-    R2  = sqrt(r^2. + (z + imW)^2);
+function compute_penny_shaped_displacement_complex(r, z, ΔP, ν, E, R)
+    imR = im*R
+    R1  = sqrt(r^2 + (z - imR)^2);
+    R2  = sqrt(r^2 + (z + imR)^2);
+    L   = log(cdiv(R2+z+imR, R1+z-imR))
 
     # equation 7a:
-    dU  = im*ΔP*(1+ν)*(1-2ν)/(2pi*E)*( r*log( (R2+z+imW)/(R1 +z- imW))
-            - r/2*((imW-3z-R2)/(R2+z+imW)
-            + (R1+3z+imW)/(R1+z-imW))
-            - (2z^2 * r)/(1 -2ν)*(1/(R2*(R2+z+imW)) -1/(R1*(R1+z-imW)))
-            + (2*z*r)/(1-2ν)*(1/R2 - 1/R1) );
+    dU  = im*ΔP*(1+ν)*(1-2ν)/(2*E*π)*( r*L
+            - r/2*(cdiv(imR-3z-R2, R2+z+imR)
+            + cdiv(R1+3z+imR, R1+z-imR))
+            - (2z^2 * r)/(1 -2ν)*(cdiv(1, R2*(R2+z+imR)) - cdiv(1, R1*(R1+z-imR)))
+            + (2*z*r)/(1-2ν)*(cdiv(1, R2) - cdiv(1, R1)) );
 
     # equation 7b:
-    dW  = 2*im*ΔP*(1-ν^2)/(pi*E)*( z*log( (R2+z+imW)/(R1+z-imW))
+    dW  = 2*im*ΔP*(1-ν^2)/(pi*E)*( z*L
             - (R2-R1)
-            - 1/(2*(1-ν))*( z*log( (R2+z+imW)/(R1+z-imW)) - imW*z*(1/R2 + 1/R1)) );
+            - 1/(2*(1-ν))*( z*L - imR*z*(cdiv(1, R2) + cdiv(1, R1))) );
 
     Uz =  real(dW);  # vertical displacement should be corrected for z<0
     Ur =  real(dU);
@@ -371,7 +260,7 @@ end
 checks if a 2D point `p` is inside the sill
 """
 function inside(p::Point{2, _T}, sill::PennyShapedSill{2,_T}; rotate::Bool=true) where {_T}
-    GeoParams.@unpack_val W,H, Center, RotMat = sill;
+    GeoParams.@unpack_val R,H, Center, RotMat = sill;
 
     # shift and optionally rotate point
     p_r = p - Center
@@ -379,7 +268,7 @@ function inside(p::Point{2, _T}, sill::PennyShapedSill{2,_T}; rotate::Bool=true)
         p_r = rotate_point(p_r, RotMat)
     end
 
-    distance    = sqrt((p_r[1] / W)^2 + (p_r[2] / (H/2))^2)
+    distance    = sqrt((p_r[1] / R)^2 + (p_r[2] / (H/2))^2)
 
     return distance <= 1
 end
@@ -391,7 +280,7 @@ end
 checks if a 3D point `p` is inside the sill
 """
 function inside(p::Point{3, _T}, sill::PennyShapedSill{3,_T}; rotate::Bool=true) where {_T}
-    GeoParams.@unpack_val W,H, Center, RotMat = sill;
+    GeoParams.@unpack_val R,H, Center, RotMat = sill;
 
     # shift and optionally rotate point
     p_r = p - Center
@@ -399,7 +288,7 @@ function inside(p::Point{3, _T}, sill::PennyShapedSill{3,_T}; rotate::Bool=true)
         p_r = rotate_point(p_r, RotMat)
     end
 
-    distance = (p_r[1] / W)^2 + (p_r[2] / W)^2 + (p_r[3] / (H/2))^2
+    distance = (p_r[1] / R)^2 + (p_r[2] / R)^2 + (p_r[3] / (H/2))^2
 
     return distance <= 1
 end
@@ -409,54 +298,20 @@ end
     update_abstractsill(s::PennyShapedSill; kwargs...) -> PennyShapedSill
 
 Return a new sill identical to `s` but with the specified parameters updated.
-Accepted keyword arguments: `Center`, `Angle`, `E`, `ν`, `W`, `H`, `ΔP`, `Q`.
+Accepted keyword arguments: `Center`, `Angle`, `E`, `ν`, `R`, `H`, `ΔP`, `Q`.
 
 When a single geometric parameter is changed, the remaining ones are kept
 consistent using these defaults:
-- only `W` → keep `H`, recompute `ΔP` and `Q`  (W+H branch)
-- only `H` → keep `W`, recompute `ΔP` and `Q`  (W+H branch)
-- only `ΔP` → keep `H`, recompute `W` and `Q`  (H+ΔP branch)
-- only `Q` → keep `H`, recompute `W` and `ΔP`  (H+Q branch)
+- only `R` → keep `H`, recompute `ΔP` and `Q`  (R+H branch)
+- only `H` → keep `R`, recompute `ΔP` and `Q`  (R+H branch)
+- only `ΔP` → keep `H`, recompute `R` and `Q`  (H+ΔP branch)
+- only `Q` → keep `H`, recompute `R` and `ΔP`  (H+Q branch)
 
 # Example
 ```julia
-p2 = update_abstractsill(p, W = 3000.0m)
-p3 = update_abstractsill(p, W = 3000.0m, H = 200.0m)
+p2 = update_abstractsill(p, R = 3000.0m)
+p3 = update_abstractsill(p, R = 3000.0m, H = 200.0m)
 p4 = update_abstractsill(p, ΔP = 2e6Pa)
 ```
 """
-function update_abstractsill(s::PennyShapedSill; kwargs...)
-    kw = Dict{Symbol,Any}(kwargs)
-
-    has_W  = haskey(kw, :W)
-    has_H  = haskey(kw, :H)
-    has_ΔP = haskey(kw, :ΔP)
-    has_Q  = haskey(kw, :Q)
-
-    W  = get(kw, :W,  nothing)
-    H  = get(kw, :H,  nothing)
-    ΔP = get(kw, :ΔP, nothing)
-    Q  = get(kw, :Q,  nothing)
-
-    # Ensure a valid parameter pair reaches the constructor.
-    if !has_W && !has_H && !has_ΔP && !has_Q
-        W = UnitValue(s.W);  H = UnitValue(s.H)   # nothing changed: keep W+H
-    elseif has_W && !has_H && !has_ΔP && !has_Q
-        H = UnitValue(s.H)                          # only W: W+H branch
-    elseif has_H && !has_W && !has_ΔP && !has_Q
-        W = UnitValue(s.W)                          # only H: W+H branch
-    elseif has_ΔP && !has_W && !has_H && !has_Q
-        H = UnitValue(s.H)                          # only ΔP: H+ΔP branch
-    elseif has_Q && !has_W && !has_H && !has_ΔP
-        H = UnitValue(s.H)                          # only Q: H+Q branch
-    # Otherwise user supplied a complete valid pair; pass as-is.
-    end
-
-    return PennyShapedSill(;
-        Center = get(kw, :Center, UnitValue(s.Center)),
-        Angle  = get(kw, :Angle,  UnitValue(s.Angle)),
-        E      = get(kw, :E,      UnitValue(s.E)),
-        ν      = get(kw, :ν,      UnitValue(s.ν)),
-        W, H, ΔP, Q,
-    )
-end
+update_abstractsill(s::PennyShapedSill; kwargs...) = update_RHΔPQ(PennyShapedSill, s; kwargs...)

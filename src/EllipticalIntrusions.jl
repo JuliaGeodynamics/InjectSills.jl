@@ -4,19 +4,45 @@ import GeoParams: isdimensional
 
 export EllipticalIntrusion
 
+"""
+    EllipticalIntrusion{N,_T}
+
+Elliptical (2D) or spheroidal (3D) intrusion of width `W` and thickness `H`, opened by a
+kinematic displacement of the host rock, see [`EllipticalIntrusion()`](@ref).
+
+Parameters:
+===
+- `Center::Point{N,_T}` - center of the intrusion
+- `Angle::Vec{N1,_T}`   - dip (and strike in 3D) [degrees]
+- `W::_T`               - width (diameter in the sill plane)
+- `H::_T`               - thickness
+"""
 struct EllipticalIntrusion{N, _T, N1, N2, U1, U2, U3} <: AbstractSill{N, _T}
     Center::GeoUnit{Point{N, _T}, U1}
     Angle::GeoUnit{Vec{N1, _T}, U2}
     W::GeoUnit{_T, U1}
     H::GeoUnit{_T, U1}
     Lengthscale::GeoUnit{_T, U1}
-    BoundingBox::Tuple
+    BoundingBox::NTuple{2, GeoUnit{Point{N, _T}, U1}}
     RotMat::GeoUnit{SMatrix{N, N, _T, N2}, U3}
 end
 Adapt.@adapt_structure EllipticalIntrusion
 
 isdimensional(s::EllipticalIntrusion) = isdimensional(s.W)
 
+"""
+    EllipticalIntrusion(; Center=Point2(0.0, -5000.0)*m, Angle=Vec1(0.0)*NoUnits, W=2000.0m, H=100.0m)
+
+Elliptical intrusion with semi-axes `W/2` in the sill plane and `H/2` normal to it. `W` and
+`H` must be positive.
+
+The host rock moves radially from the center, on ellipses (2D) or spheroids (3D) similar to
+the intrusion: a point on the one with semi-axis `a` in the sill plane moves to the one with
+`a′ = ∛(a³ + (W/2)³)`. This cube rule holds in 2D and 3D, so the map conserves volume
+exactly in 3D and in an axisymmetric 2D section, but not area in Cartesian 2D. Its
+far-field footprint scales like depth × W/H; for thin sills under a free surface, use
+[`PennyShapedSill`](@ref) (3D) or [`PlaneStrainSill`](@ref) (Cartesian 2D).
+"""
 function EllipticalIntrusion(;
     Center = Point2(0.0, -5000.0) * m,
     Angle  = Vec1(0.0) * NoUnits,
@@ -24,6 +50,8 @@ function EllipticalIntrusion(;
     H      = 100.0m,
 )
     @assert length(Center) == length(Angle) + 1
+    check_positive(EllipticalIntrusion, :W, W)
+    check_positive(EllipticalIntrusion, :H, H)
     RotMat = RotationMatrix(ustrip.(Angle))
     Cg = convert(GeoUnit, Center)
     Wg = convert(GeoUnit, W)
@@ -64,6 +92,13 @@ end
 area(s::EllipticalIntrusion) = π * UnitValue(s.W) / 2 * UnitValue(s.H) / 2
 volume(s::EllipticalIntrusion) = (4 / 3) * π * (UnitValue(s.W) / 2) * (UnitValue(s.W) / 2) * (UnitValue(s.H) / 2)
 
+# Cube root of x > 0 that GPU kernels can compile: Base.cbrt(::Float32) refines in Float64,
+# and Metal.jl < 1.11 has no device cbrt. One Newton step restores full precision.
+function kernel_cbrt(x)
+    c = exp(log(x) / 3)
+    return c - (c^3 - x) / (3 * c^2)
+end
+
 function hostrock_displacement(sill::EllipticalIntrusion{N, _T}, p::Point{N, _T}) where {N, _T}
     GeoParams.@unpack_val W, H, Center, RotMat = sill
     p_r = rotate_point(p - Center, RotMat)
@@ -75,10 +110,11 @@ function hostrock_displacement(sill::EllipticalIntrusion{N, _T}, p::Point{N, _T}
         if a == 0
             return Vec2{_T}(zero(_T), zero(_T))
         end
-        a3 = a^3
-        a_inject = W / 2
-        Vol_inject = (4 / 3) * π * a_inject^3 * AR
-        da = ((Vol_inject + (4 / 3) * π * a3 * AR) / ((4 / 3) * π * AR))^(1 / 3) - a
+        # The injected volume (W/2)³ is added to the ellipsoid of semi-axis a:
+        # da = cbrt((W/2)³ + a³) - a, written without cancellation for a ≫ W/2
+        b  = (W / 2)^3
+        c  = kernel_cbrt(b + a^3)
+        da = b / (c^2 + c * a + a^2)
         d_r = Vec2{_T}(x * (da / a), z * (da / a))
         return rotate_point(d_r, RotMat')
     else
@@ -89,10 +125,11 @@ function hostrock_displacement(sill::EllipticalIntrusion{N, _T}, p::Point{N, _T}
         if a == 0
             return Vec3{_T}(zero(_T), zero(_T), zero(_T))
         end
-        a3 = a^3
-        a_inject = W / 2
-        Vol_inject = (4 / 3) * π * a_inject^3 * AR
-        da = ((Vol_inject + (4 / 3) * π * a3 * AR) / ((4 / 3) * π * AR))^(1 / 3) - a
+        # The injected volume (W/2)³ is added to the ellipsoid of semi-axis a:
+        # da = cbrt((W/2)³ + a³) - a, written without cancellation for a ≫ W/2
+        b  = (W / 2)^3
+        c  = kernel_cbrt(b + a^3)
+        da = b / (c^2 + c * a + a^2)
         d_r = Vec3{_T}(x * (da / a), y * (da / a), z * (da / a))
         return rotate_point(d_r, RotMat')
     end

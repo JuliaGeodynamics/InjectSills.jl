@@ -10,7 +10,7 @@ struct CylindricalDikeTopAccretion{N, _T, N1, N2, U1, U2, U3} <: AbstractSill{N,
     W::GeoUnit{_T, U1}
     H::GeoUnit{_T, U1}
     Lengthscale::GeoUnit{_T, U1}
-    BoundingBox::Tuple
+    BoundingBox::NTuple{2, GeoUnit{Point{N, _T}, U1}}
     RotMat::GeoUnit{SMatrix{N, N, _T, N2}, U3}
 end
 Adapt.@adapt_structure CylindricalDikeTopAccretion
@@ -21,7 +21,7 @@ struct CylindricalDikeTopAccretionFullModelAdvection{N, _T, N1, N2, U1, U2, U3} 
     W::GeoUnit{_T, U1}
     H::GeoUnit{_T, U1}
     Lengthscale::GeoUnit{_T, U1}
-    BoundingBox::Tuple
+    BoundingBox::NTuple{2, GeoUnit{Point{N, _T}, U1}}
     RotMat::GeoUnit{SMatrix{N, N, _T, N2}, U3}
 end
 Adapt.@adapt_structure CylindricalDikeTopAccretionFullModelAdvection
@@ -36,6 +36,8 @@ function CylindricalDikeTopAccretion(;
     H      = 100.0m,
 )
     @assert length(Center) == length(Angle) + 1
+    check_positive(CylindricalDikeTopAccretion, :W, W)
+    check_positive(CylindricalDikeTopAccretion, :H, H)
     RotMat = RotationMatrix(ustrip.(Angle))
     Cg = convert(GeoUnit, Center)
     Wg = convert(GeoUnit, W)
@@ -56,6 +58,8 @@ function CylindricalDikeTopAccretionFullModelAdvection(;
     H      = 100.0m,
 )
     @assert length(Center) == length(Angle) + 1
+    check_positive(CylindricalDikeTopAccretionFullModelAdvection, :W, W)
+    check_positive(CylindricalDikeTopAccretionFullModelAdvection, :H, H)
     RotMat = RotationMatrix(ustrip.(Angle))
     Cg = convert(GeoUnit, Center)
     Wg = convert(GeoUnit, W)
@@ -168,7 +172,7 @@ function inside(p::Point{3, _T}, sill::CylindricalDikeTopAccretion{3, _T}; rotat
     if rotate
         p_r = rotate_point(p_r, RotMat)
     end
-    return abs(p_r[1]) <= W / 2 && abs(p_r[2]) <= W / 2 && abs(p_r[3]) <= H / 2
+    return p_r[1]^2 + p_r[2]^2 <= (W / 2)^2 && abs(p_r[3]) <= H / 2
 end
 
 function inside(p::Point{2, _T}, sill::CylindricalDikeTopAccretionFullModelAdvection{2, _T}; rotate::Bool=true) where {_T}
@@ -185,7 +189,7 @@ function inside(p::Point{3, _T}, sill::CylindricalDikeTopAccretionFullModelAdvec
     if rotate
         p_r = rotate_point(p_r, RotMat)
     end
-    return abs(p_r[1]) <= W / 2 && abs(p_r[2]) <= W / 2 && abs(p_r[3]) <= H / 2
+    return p_r[1]^2 + p_r[2]^2 <= (W / 2)^2 && abs(p_r[3]) <= H / 2
 end
 
 function update_abstractsill(s::CylindricalDikeTopAccretion; kwargs...)

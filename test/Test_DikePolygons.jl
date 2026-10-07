@@ -45,7 +45,7 @@ end
 end
 
 @testset "dike_polygon penny-shaped sill" begin
-    s = PennyShapedSill(Center=Point2(10.0, -5000.0)*m, W=1000.0m, H=200.0m, Angle=Vec1(0.0)*NoUnits)
+    s = PennyShapedSill(Center=Point2(10.0, -5000.0)*m, R=1000.0m, H=200.0m, Angle=Vec1(0.0)*NoUnits)
     poly = dike_polygon(s, 101)
     x, z = poly
     @test length(x) == 101
@@ -55,7 +55,7 @@ end
     @test maximum(z) ≈ -4900.0 atol=1e-8
     @test minimum(z) ≈ -5100.0 atol=1e-8
 
-    srot = PennyShapedSill(Center=Point2(10.0, -5000.0)*m, W=1000.0m, H=200.0m, Angle=Vec1(90.0)*NoUnits)
+    srot = PennyShapedSill(Center=Point2(10.0, -5000.0)*m, R=1000.0m, H=200.0m, Angle=Vec1(90.0)*NoUnits)
     polyrot = dike_polygon(srot, 101)
     xr, zr = polyrot
     @test maximum(xr) ≈ 110.0 atol=1e-6

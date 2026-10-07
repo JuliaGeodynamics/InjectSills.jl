@@ -1,4 +1,5 @@
 [![CI](https://github.com/JuliaGeodynamics/InjectSills.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/JuliaGeodynamics/InjectSills.jl/actions/workflows/CI.yml)
+[![codecov](https://codecov.io/gh/JuliaGeodynamics/InjectSills.jl/graph/badge.svg)](https://codecov.io/gh/JuliaGeodynamics/InjectSills.jl)
 
 # InjectSills.jl
 
@@ -11,14 +12,13 @@ All source types are subtypes of `AbstractSill{N,T}` and share a common interfac
 
 #### `PennyShapedSill` — penny-shaped tensile crack (2D / 3D)
 
-Displacement field around a pressurized elliptical sill in a homogeneous elastic half-space.
+Displacement field around a pressurized penny-shaped crack (Sun, 1969). A 2D sill is the axisymmetric section of the penny: the 3D solution in the vertical plane through the sill axis.
 
 ```julia
 sill = PennyShapedSill(
     Center = Point3(0.0, 0.0, -5000.0)*m,
-    W      = 2000.0m,     # radius
+    R      = 2000.0m,     # radius
     H      = 100.0m,      # maximum opening thickness
-    ΔP     = 1e6Pa,
     E      = 1.5e10Pa,
     ν      = 0.3*NoUnits,
     Angle  = Vec2(10.0, 0.0),   # dip, strike [degrees]
@@ -27,6 +27,26 @@ d = hostrock_displacement(sill, Point3(x, y, z))
 ```
 
 Reference: Sun, R.J. (1969): Theoretical size of hydraulically induced horizontal fractures and corresponding surface uplift in an idealized medium. *J. Geophys. Res.* 74, 5995–6011. https://doi.org/10.1029/JB074i025p05995
+
+---
+
+#### `PlaneStrainSill` — pressurized crack in plane strain (2D)
+
+Sill in a Cartesian 2D model: a crack of half-length `R` with the elliptical opening `H√(1 - x²/R²)`, where `H = 4(1-ν²) ΔP R/E`. Its cross-sectional area is `Q = π R H/2`; half of it crosses every line parallel to the sill on either side. Takes the same keywords as the 2D `PennyShapedSill`, with `Q` an area.
+
+```julia
+sill = PlaneStrainSill(
+    Center = Point2(0.0, -5000.0)*m,
+    R      = 2000.0m,     # half-length
+    H      = 10.0m,       # maximum opening
+    E      = 1.5e10Pa,
+    ν      = 0.3*NoUnits,
+    Angle  = Vec1(10.0),  # dip [degrees]
+)
+d = hostrock_displacement(sill, Point2(x, z))
+```
+
+References: Westergaard, H.M. (1939): Bearing pressures and cracks. *J. Appl. Mech.* 6, A49–A53. Pollard, D.D. & Segall, P. (1987): Theoretical displacements and stresses near fractures in rock. In Atkinson, B.K. (ed.), *Fracture Mechanics of Rock*, Academic Press, 277–349.
 
 ---
 
@@ -65,6 +85,17 @@ d = hostrock_displacement(src, Point3(x, y, z))
 ```
 
 Reference: McTigue, D.F. (1987): Elastic stress and deformation near a finite spherical magma body: resolution of the point source paradox. *J. Geophys. Res.* 92 (B12), 12931–12940. https://doi.org/10.1029/JB092iB12p12931
+
+---
+
+#### `EllipticalIntrusion` — kinematic elliptical intrusion (2D / 3D)
+
+Finite displacement that opens an ellipse (2D) or spheroid (3D) of width `W` and thickness `H` by growing similar ellipses/spheroids from the center with the cube rule. It conserves volume in 3D and in an axisymmetric 2D section, but not area in Cartesian 2D. Its far-field footprint scales like depth × W/H; for thin sills under a free surface, use `PennyShapedSill` (3D) or `PlaneStrainSill` (Cartesian 2D).
+
+```julia
+intr = EllipticalIntrusion(Center=Point2(0.0, -5000.0)*m, Angle=Vec1(0.0)*NoUnits, W=2000.0m, H=100.0m)
+d = hostrock_displacement(intr, Point2(x, z))
+```
 
 ---
 
