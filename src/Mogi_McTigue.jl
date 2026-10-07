@@ -9,7 +9,8 @@ export MogiSphere, McTigueSphere
 """
     MogiSphere{N,_T}
 
-Pressurized spherical cavity in an elastic half-space (Mogi, 1958).
+Pressurized spherical cavity in an elastic half-space (Mogi, 1958). The displacement is the
+half-space surface solution, evaluated at every point.
 
 Parameters:
 ===
@@ -239,8 +240,8 @@ end
     d = hostrock_displacement(sill::McTigueSphere{N,_T}, p::Point{N,_T})
 
 Displacement at `p` due to a McTigue spherical pressure source.
-Adds a `(r/d)³` finite-size correction to the Mogi solution, where `d`
-is the vertical distance from source centre to observation point.
+Adds a `(r/d)³` finite-size correction to the Mogi solution, where `d = |Center[N]|`
+is the depth of the source below `z = 0`.
 """
 function hostrock_displacement(sill::McTigueSphere{N, _T}, p::Point{N, _T}) where {N, _T}
     GeoParams.@unpack_val ν, G, r, ΔP, Center = sill

@@ -30,6 +30,7 @@ end
 
 @testset "update_abstractsill keywords" begin
     sills = (PennyShapedSill(Center=C2, Angle=Vec1(0.0), W=1000.0m, H=10.0m),
+             PlaneStrainSill(Center=C2, Angle=Vec1(0.0), W=1000.0m, H=10.0m),
              SquareDike(Center=C2, Angle=Vec1(0.0)*NoUnits),
              SquareDikeTopAccretion(Center=C2, Angle=Vec1(0.0)*NoUnits),
              CylindricalDikeTopAccretion(Center=C2, Angle=Vec1(0.0)*NoUnits),

@@ -11,6 +11,10 @@ GPU_BACKEND in ("CPU", "CUDA", "AMDGPU", "Metal") ||
     include("PennyShapedSill.jl")
 end
 
+@testset "Plane-strain sill" begin
+    include("Test_PlaneStrainSill.jl")
+end
+
 @testset "Square dike sill" begin
     include("Test_SquareDike.jl")
 end

@@ -32,6 +32,12 @@ sills_2d = [
         W      = 1000.0m,
         H      = 100.0m,
     ),
+    PlaneStrainSill(           # rotated
+        Center = Point2(0.0, -5000.0) * m,
+        Angle  = Vec1(30.0) * NoUnits,
+        W      = 1000.0m,
+        H      = 100.0m,
+    ),
     SquareDike(
         Center = Point2(0.0, -5000.0) * m,
         Angle  = Vec1(0.0) * NoUnits,

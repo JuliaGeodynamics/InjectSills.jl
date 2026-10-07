@@ -24,6 +24,7 @@ function gpu_test_sills(::Type{F}) where {F}
     end
     push!(sills, FiniteEllipsoidalCavity(Center=C3, ax=F(500)m, ay=F(300)m, az=F(2000)m,
         Angle=Vec{3,F}(10, 20, 45)*NoUnits, ΔP=F(1e6)Pa, mu=F(10e9)Pa, lambda=F(10e9)Pa))
+    push!(sills, PlaneStrainSill(Center=C2, Angle=A1, W=F(1000)m, H=F(10)m, E=F(1.5e10)Pa, ν=F(0.3)*NoUnits))
     return sills
 end
 

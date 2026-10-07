@@ -4,6 +4,19 @@ import GeoParams: isdimensional
 
 export EllipticalIntrusion
 
+"""
+    EllipticalIntrusion{N,_T}
+
+Elliptical (2D) or spheroidal (3D) intrusion of width `W` and thickness `H`, opened by a
+kinematic displacement of the host rock, see [`EllipticalIntrusion()`](@ref).
+
+Parameters:
+===
+- `Center::Point{N,_T}` - center of the intrusion
+- `Angle::Vec{N1,_T}`   - dip (and strike in 3D) [degrees]
+- `W::_T`               - width (diameter in the sill plane)
+- `H::_T`               - thickness
+"""
 struct EllipticalIntrusion{N, _T, N1, N2, U1, U2, U3} <: AbstractSill{N, _T}
     Center::GeoUnit{Point{N, _T}, U1}
     Angle::GeoUnit{Vec{N1, _T}, U2}
@@ -17,6 +30,19 @@ Adapt.@adapt_structure EllipticalIntrusion
 
 isdimensional(s::EllipticalIntrusion) = isdimensional(s.W)
 
+"""
+    EllipticalIntrusion(; Center=Point2(0.0, -5000.0)*m, Angle=Vec1(0.0)*NoUnits, W=2000.0m, H=100.0m)
+
+Elliptical intrusion with semi-axes `W/2` in the sill plane and `H/2` normal to it. `W` and
+`H` must be positive.
+
+The host rock moves radially from the center, on ellipses (2D) or spheroids (3D) similar to
+the intrusion: a point on the one with semi-axis `a` in the sill plane moves to the one with
+`a′ = ∛(a³ + (W/2)³)`. This cube rule holds in 2D and 3D, so the map conserves volume
+exactly in 3D and in an axisymmetric 2D section, but not area in Cartesian 2D. Its
+far-field footprint scales like depth × W/H; for thin sills under a free surface, use
+[`PennyShapedSill`](@ref) (3D) or [`PlaneStrainSill`](@ref) (Cartesian 2D).
+"""
 function EllipticalIntrusion(;
     Center = Point2(0.0, -5000.0) * m,
     Angle  = Vec1(0.0) * NoUnits,

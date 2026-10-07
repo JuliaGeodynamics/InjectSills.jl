@@ -4,14 +4,14 @@ using InjectSills
 using GLMakie
 
 """
-    fig, ax = plot_sill(sill::PennyShapedSill{2}; scale=1.0, kwargs...)
+    fig, ax = plot_sill(sill::Union{PennyShapedSill{2}, PlaneStrainSill}; scale=1.0, kwargs...)
 
-Plot the outline of a 2-D penny-shaped sill.
+Plot the outline of a 2-D penny-shaped or plane-strain sill.
 `scale` rescales coordinates (e.g. `scale=1e-3` for km).
 Extra `kwargs` are forwarded to `lines!`.
 """
 function InjectSills.plot_sill(
-    sill::PennyShapedSill{2,_T}; scale=1.0, kwargs...
+    sill::Union{PennyShapedSill{2,_T}, PlaneStrainSill{_T}}; scale=1.0, kwargs...
 ) where {_T}
     N     = 200
     theta = range(0, 2π; length=N)

@@ -35,7 +35,7 @@ function dike_polygon(sill::EllipticalIntrusion{N, _T}, nump::Integer=101) where
     return [collect(x), collect(z)]
 end
 
-function dike_polygon(sill::PennyShapedSill{2, _T}, nump::Integer=101) where {_T}
+function dike_polygon(sill::Union{PennyShapedSill{2, _T}, PlaneStrainSill{_T}}, nump::Integer=101) where {_T}
     GeoParams.@unpack_val W, H, Center = sill
     n = max(4, Int(nump))
     p = range(zero(_T), stop=2 * π, length=n)

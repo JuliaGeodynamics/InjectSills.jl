@@ -9,7 +9,7 @@ export update_abstractsill
 
 
 """
-    PennyShapedSill{N,N1,_T}
+    PennyShapedSill{N,_T}
 
 Holds information about a penny shaped sill in 2D or 3D.
 
@@ -21,15 +21,18 @@ Parameters:
 - `ν::_T`                 - Poisson's ratio
 - `ΔP::_T`                - Overpressure within sill
 - `Q::_T`                 - Total injected volume of sill [m^3]
-- `W::_T = (3*E*Q/(16*(1-ν^2)*ΔP))^(1.0/3.0)`     - Width of sill
+- `W::_T = cbrt(3*E*Q/(16*(1-ν^2)*ΔP))`     - Radius (3D) or half-length (2D) of sill
 - `H::_T = 8*(1-ν^2)*ΔP*W/(π*E)`                  - Maximum thickness of sill
+
+A 2D sill is the axisymmetric section of the penny: its displacement is the 3D solution in
+the vertical plane through the sill axis, and `ΔP` and `Q` are those of the 3D penny. For a
+sill in a Cartesian 2D (plane-strain) model, use [`PlaneStrainSill`](@ref).
 
 Reference:
 ===
    Sun, R.J., 1969. Theoretical size of hydraulically induced horizontal fractures and
         corresponding surface uplift in an idealized medium. J. Geophys. Res. 74, 5995–6011.
         https://doi.org/10.1029/JB074i025p05995
-
 """
 struct PennyShapedSill{N, _T, N1, N2, U1, U2, U3, U4, U5} <: AbstractSill{N,_T}
     Center::GeoUnit{Point{N, _T},U1}  # m
@@ -52,7 +55,7 @@ isdimensional(s::PennyShapedSill) = isdimensional(s.E)
 """
     PennyShapedSill(; W=nothing,  Q=nothing, ΔP=nothing, H=nothing, E=1.5e10Pa, ν=0.3*NoUnits, Angle=Vec1(0.0)*Pas, Center=Point2(0.0)*m)
 
-Defines parameters for a penny shaped sill in an elastic halfspace.
+Defines parameters for a penny shaped sill in a homogeneous elastic medium.
 The geometry is set by at most two of `W`, `H`, `ΔP`, `Q`:
 - any two of them (`W`+`H`, `W`+`Q`, `W`+`ΔP`, `H`+`Q`, `H`+`ΔP`, `Q`+`ΔP`)
 - only `Q` (with `ΔP = 1e6Pa`) or only `ΔP` (with the `W` of the default sill)
