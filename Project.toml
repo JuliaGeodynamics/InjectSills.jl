@@ -22,28 +22,23 @@ InjectSillsJustPICExt = "JustPIC"
 InjectSillsMakieExt = "Makie"
 
 [compat]
-AMDGPU = "1, 2"
 Adapt = "4"
-CUDA = "5, 6"
-GeoParams = "0.7, 0.8"
+GeoParams = "0.7, 0.8, 0.9"
 GeometryBasics = "0.5"
 GeophysicalModelGenerator = "0.7, 0.8"
 JustPIC = "0.7.12"
 KernelAbstractions = "0.9"
 LinearAlgebra = "1"
 Makie = "0.24"
-Metal = "1"
 StaticArrays = "1"
 julia = "1.10"
 
 [extras]
-AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
-CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 GeophysicalModelGenerator = "3700c31b-fa53-48a6-808a-ef22d5a84742"
 InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 JustPIC = "10dc771f-8528-4cd9-9d3b-b21b2e693339"
-Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
+Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["AMDGPU", "CUDA", "GeophysicalModelGenerator", "InteractiveUtils", "JustPIC", "Metal", "Test"]
+test = ["GeophysicalModelGenerator", "InteractiveUtils", "JustPIC", "Makie", "Test"]
