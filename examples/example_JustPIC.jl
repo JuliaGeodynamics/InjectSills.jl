@@ -1,20 +1,4 @@
-import Pkg
-
-function ensure_example_env!()
-    # Keep JustPIC optional for InjectSills itself by using a local env for this example.
-    env_dir = joinpath(@__DIR__, ".justpic_example_env")
-    Pkg.activate(env_dir)
-
-    pkgs = Set(keys(Pkg.project().dependencies))
-    "InjectSills" in pkgs || Pkg.develop(path=joinpath(@__DIR__, ".."))
-    "JustPIC" in pkgs     || Pkg.add(name="JustPIC")
-    "GLMakie" in pkgs     || Pkg.add(name="GLMakie")
-
-    Pkg.instantiate()
-end
-
-ensure_example_env!()
-
+# Requires InjectSills, JustPIC and GLMakie in the active environment.
 using InjectSills
 using JustPIC
 using GLMakie
