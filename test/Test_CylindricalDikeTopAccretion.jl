@@ -26,9 +26,9 @@ d_below = hostrock_displacement(c2, Point2(100.0, -5010.0))
 d_above = hostrock_displacement(c2, Point2(100.0, -4990.0))
 @test d_above[2] ≈ 0.0
 
-# MTK behavior: condition is x <= W/2 (not abs(x)), so far negative x is also "inside"
-d_left = hostrock_displacement(c2, Point2(-5000.0, -5010.0))
-@test d_left[2] ≈ -100.0
+# the footprint is symmetric about the center
+@test hostrock_displacement(c2, Point2(-100.0, -5010.0))[2] ≈ -100.0
+@test hostrock_displacement(c2, Point2(-5000.0, -5010.0))[2] ≈ 0.0
 
 @test inside(Point2(0.0, -5000.0), c2) == true
 @test inside(Point2(999.0, -5000.0), c2) == true

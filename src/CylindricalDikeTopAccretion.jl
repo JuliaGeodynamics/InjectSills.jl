@@ -130,7 +130,7 @@ function hostrock_displacement(sill::CylindricalDikeTopAccretion{N, _T}, p::Poin
     GeoParams.@unpack_val W, H, Center, RotMat = sill
     p_r = rotate_point(p - Center, RotMat)
     if N == 2
-        if p_r[2] <= 0 && p_r[1] <= W / 2
+        if p_r[2] <= 0 && abs(p_r[1]) <= W / 2
             return rotate_point(Vec2{_T}(zero(_T), -H), RotMat')
         end
         return Vec2{_T}(zero(_T), zero(_T))
