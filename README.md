@@ -1,4 +1,5 @@
 [![CI](https://github.com/JuliaGeodynamics/InjectSills.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/JuliaGeodynamics/InjectSills.jl/actions/workflows/CI.yml)
+[![GPU Unit Tests](https://img.shields.io/buildkite/6b970b1066dc828a56a75bccc65a8bc896a8bb76012a61fe96/main?label=GPU%20Unit%20Tests)](https://buildkite.com/julialang/injectsills-dot-jl)
 [![codecov](https://codecov.io/gh/JuliaGeodynamics/InjectSills.jl/graph/badge.svg)](https://codecov.io/gh/JuliaGeodynamics/InjectSills.jl)
 
 # InjectSills.jl
