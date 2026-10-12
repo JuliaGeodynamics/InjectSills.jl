@@ -94,6 +94,13 @@ sills_2d = [
         G      = 10e9Pa,
         ν      = 0.25 * NoUnits,
     ),
+    MindlinSphere(
+        Center = Point2(0.0, -5000.0) * m,
+        r      = 1500.0m,
+        ΔP     = 10e6Pa,
+        G      = 10e9Pa,
+        ν      = 0.25 * NoUnits,
+    ),
 ]
 
 @testset "new_point_inside_sill – 2D" begin
@@ -172,6 +179,13 @@ sills_3d = [
         ν      = 0.25 * NoUnits,
     ),
     McTigueSphere(
+        Center = Point3(0.0, 0.0, -5000.0) * m,
+        r      = 1500.0m,
+        ΔP     = 10e6Pa,
+        G      = 10e9Pa,
+        ν      = 0.25 * NoUnits,
+    ),
+    MindlinSphere(
         Center = Point3(0.0, 0.0, -5000.0) * m,
         r      = 1500.0m,
         ΔP     = 10e6Pa,

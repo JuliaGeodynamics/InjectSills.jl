@@ -22,6 +22,7 @@ include("SquareDikeTopAccretion.jl")
 include("CylindricalDikeTopAccretion.jl")
 include("EllipticalIntrusions.jl")
 include("Mogi_McTigue.jl")
+include("MindlinSphere.jl")
 include("FiniteEllipsoidalCavity.jl")
 include("DikePolygons.jl")
 

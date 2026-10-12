@@ -54,6 +54,10 @@ end
     include("Test_Mogi_McTigue.jl")
 end
 
+@testset "Mindlin half-space source" begin
+    include("Test_MindlinSphere.jl")
+end
+
 @testset "Array displacement" begin
     include("Test_ArrayDisplacement.jl")
 end

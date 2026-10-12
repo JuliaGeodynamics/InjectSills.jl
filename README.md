@@ -89,6 +89,25 @@ Reference: McTigue, D.F. (1987): Elastic stress and deformation near a finite sp
 
 ---
 
+#### `MindlinSphere` — half-space centre of dilatation (2D / 3D)
+
+Point-source limit of a pressurized sphere with the complete displacement field *inside* the half-space (Mindlin & Cheng, 1950; the inflation point source of Okada, 1992). At the free surface `z = 0` it equals the Mogi solution; near the source it tends to the full-space field `ΔV/(4π)·r/|r|³`, so the volume displaced in the rock equals the volume change `ΔV = π ΔP r³/G`. Use it when the displacement is needed at depth (e.g. to move host rock around an inflating or draining body): `MogiSphere` evaluates the surface formula everywhere, which dilates the interior by `4(1 − ν)` times the volume change.
+
+```julia
+src = MindlinSphere(
+    Center = Point3(0.0, 0.0, -5000.0)*m,
+    r      = 1500.0m,
+    ΔP     = 10e6Pa,
+    G      = 10e9Pa,
+    ν      = 0.25*NoUnits,
+)
+d = hostrock_displacement(src, Point3(x, y, z))   # z ≤ 0
+```
+
+References: Mindlin, R.D. & Cheng, D.H. (1950): Nuclei of strain in the semi-infinite solid. *J. Appl. Phys.* 21, 926–930. https://doi.org/10.1063/1.1699785. Okada, Y. (1992): Internal deformation due to shear and tensile faults in a half-space. *Bull. Seismol. Soc. Am.* 82, 1018–1040.
+
+---
+
 #### `EllipticalIntrusion` — kinematic elliptical intrusion (2D / 3D)
 
 Finite displacement that opens an ellipse (2D) or spheroid (3D) of width `W` and thickness `H` by growing similar ellipses/spheroids from the center with the cube rule. It conserves volume in 3D and in an axisymmetric 2D section, but not area in Cartesian 2D. Its far-field footprint scales like depth × W/H; for thin sills under a free surface, use `PennyShapedSill` (3D) or `PlaneStrainSill` (Cartesian 2D).
