@@ -1,0 +1,12 @@
+{
+  "title": "InjectSills.jl",
+  "description": "Julia package with analytical solutions for the displacement around sills, dikes and magmatic intrusions in an elastic half-space, used to emplace intrusions kinematically in thermal and geodynamic models.",
+  "license": "MIT",
+  "upload_type": "software",
+  "creators": [
+    {"name": "Kaus, Boris J. P.", "affiliation": "Johannes Gutenberg University Mainz", "orcid": "0000-0002-0247-8660"},
+    {"name": "Spang, Arne", "affiliation": "University of Bayreuth", "orcid": "0000-0002-6107-0403"},
+    {"name": "de Montserrat, Albert", "affiliation": "ETH Zürich", "orcid": "0000-0003-1694-3735"}
+  ],
+  "keywords": ["magma", "sills", "dikes", "intrusions", "Julia"]
+}
